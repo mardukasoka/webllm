@@ -1257,11 +1257,12 @@ setModelStatus("loading", loadingLabel);
       await repairPoisonedGgufCache(def, cacheEnv());
     }
     state.model = await getRuntimeAdapter(def.runtime).loadModel(def, loadOpts);
-    // Bonsai27B.load() already runs kernel warmup; Gemma/LFM need a follow-up call.
-    if (def.runtime !== "bonsai") {
-      setProgressTarget(0.99);
-      await state.model.warmup();
-    }
+
+// Local runtimes may require warm-up. Remote providers do not.
+if (def.runtime !== "bonsai" && def.runtime !== "remote") {
+  setProgressTarget(0.99);
+  await state.model.warmup();
+}
     setProgressImmediate(1, "Model ready");
     state.modelLoadSecs = ((performance.now() - started) / 1000).toFixed(1);
     state.loadedModelId = def.id;
@@ -1272,9 +1273,22 @@ setModelStatus("loading", loadingLabel);
       savePrefs();
     }
     setTimeout(() => $("load-bar-wrap").classList.remove("show"), 500);
-    requestPersistentStorage();
-    try {
-      state.modelCached = await checkModelCached(def);
+    if (def.runtime !== "remote") {
+  requestPersistentStorage();
+  try {
+    state.modelCached = await checkModelCached(def);
+    if (!state.modelCached && !state.fileOrigin) {
+      toast("Model loaded, but offline cache was not detected. It may re-download on the next visit.");
+    }
+    updateStorageUIAfterLoad(def);
+  } catch (cacheErr) {
+    console.warn("Could not verify model cache after load.", cacheErr);
+    state.modelCached = false;
+  }
+} else {
+  state.modelCached = false;
+  setModelStatus("ready", "Remote AI connected");
+}
       if (!state.modelCached && !state.fileOrigin) {
         toast("Model loaded, but offline cache was not detected. It may re-download on the next visit.");
       }
