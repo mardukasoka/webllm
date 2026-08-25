@@ -1229,14 +1229,22 @@ const loadDisabled =
 }
 
 async function loadModel() {
-  if (state.model || state.loading || state.storageChecking || !state.webgpuOk) return;
   const def = activeModelDef();
+  const remoteSelected = def?.runtime === "remote";
+
+  if (
+    state.model
+    || state.loading
+    || state.storageChecking
+    || (!remoteSelected && !state.webgpuOk)
+  ) return;
   state.loading = true;
   updateComposerState();
   renderModelPicker();
   $("load-bar-wrap").classList.add("show");
-  setProgressImmediate(0.02, "Requesting WebGPU…");
-  setModelStatus("loading", "Requesting WebGPU…");
+  const loadingLabel = remoteSelected ? "Connecting to remote AI…" : "Requesting WebGPU…";
+setProgressImmediate(0.02, loadingLabel);
+setModelStatus("loading", loadingLabel);
   const started = performance.now();
   try {
     const loadOpts = {
