@@ -1195,13 +1195,16 @@ function updateComposerState() {
   updateLocalFileToolsUI();
   if (sessionLocked) hideFileAutocomplete();
 
-  const loadDisabled =
-    state.loading
-    || state.busy
-    || !state.webgpuOk
-    || state.webgpuChecking
-    || state.storageChecking
-    || !!state.model;
+  const remoteSelected = activeModelDef()?.runtime === "remote";
+
+const loadDisabled =
+  state.loading
+  || state.busy
+  || (!remoteSelected && !state.webgpuOk)
+  || (!remoteSelected && state.webgpuChecking)
+  || state.storageChecking
+  || !!state.model;
+
   for (const btn of [$("load-model-btn"), $("load-model-btn-hero")]) {
     if (!btn) continue;
     btn.disabled = loadDisabled;
