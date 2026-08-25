@@ -1273,29 +1273,21 @@ if (def.runtime !== "bonsai" && def.runtime !== "remote") {
       savePrefs();
     }
     setTimeout(() => $("load-bar-wrap").classList.remove("show"), 500);
-    if (def.runtime !== "remote") {
-  requestPersistentStorage();
-  try {
-    state.modelCached = await checkModelCached(def);
-    if (!state.modelCached && !state.fileOrigin) {
-      toast("Model loaded, but offline cache was not detected. It may re-download on the next visit.");
-    }
-    updateStorageUIAfterLoad(def);
-  } catch (cacheErr) {
-    console.warn("Could not verify model cache after load.", cacheErr);
-    state.modelCached = false;
-  }
-} else {
-  state.modelCached = false;
-  setModelStatus("ready", "Remote AI connected");
-}
-      if (!state.modelCached && !state.fileOrigin) {
-        toast("Model loaded, but offline cache was not detected. It may re-download on the next visit.");
+        if (def.runtime !== "remote") {
+      requestPersistentStorage();
+      try {
+        state.modelCached = await checkModelCached(def);
+        if (!state.modelCached && !state.fileOrigin) {
+          toast("Model loaded, but offline cache was not detected. It may re-download on the next visit.");
+        }
+        updateStorageUIAfterLoad(def);
+      } catch (cacheErr) {
+        console.warn("Could not verify model cache after load.", cacheErr);
+        state.modelCached = false;
       }
-      updateStorageUIAfterLoad(def);
-    } catch (cacheErr) {
-      console.warn("Could not verify model cache after load.", cacheErr);
+    } else {
       state.modelCached = false;
+      setModelStatus("ready", "Remote AI connected");
     }
     renderModelPicker();
   } catch (err) {
