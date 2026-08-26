@@ -276,6 +276,7 @@ const state = {
   busy: false,
   abort: null,
   roundtable: null,
+  roundtableRemoteModel: null,
   councilMode: "solo",
   webgpuOk: false,
   webgpuBrowser: "other",
@@ -346,21 +347,22 @@ function createLocalCouncilParticipant() {
 }
 
 function createRemoteCouncilParticipant() {
-  const def = loadedModelDef();
+  const remoteModel =
+    state.roundtableRemoteModel;
 
-  if (
-    !state.model ||
-    def?.runtime !== "remote"
-  ) {
+  if (!remoteModel) {
     return null;
   }
 
   return {
-    id: `remote:${def.id}`,
-    name: def.name || "Remote AI",
-    model: def.id,
+    id: `remote:${remoteModel.model}`,
+    name:
+      remoteModel.name ||
+      remoteModel.model ||
+      "Remote AI",
+    model: remoteModel.model,
     runtime: "remote",
-    modelInstance: state.model,
+    modelInstance: remoteModel,
   };
 }
 
