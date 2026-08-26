@@ -276,6 +276,7 @@ const state = {
   busy: false,
   abort: null,
   roundtable: null,
+  councilMode: "solo",
   webgpuOk: false,
   webgpuBrowser: "other",
   webgpuChecking: true,
@@ -3397,6 +3398,17 @@ $("theme-toggle").addEventListener("click", () => {
 });
 $("load-model-btn").addEventListener("click", loadModel);
 $("load-model-btn-hero").addEventListener("click", loadModel);
+$("council-mode").addEventListener("change", e => {
+  state.councilMode = e.target.value;
+
+  if (state.councilMode === "roundtable") {
+    createDefaultRoundtable();
+  }
+
+  if (state.councilMode === "solo") {
+    state.roundtable = null;
+  }
+});
 $("new-chat-btn").addEventListener("click", async () => {
   focusComposerInput($("user-input"));
   const inherited = inheritedSessionSettings();
