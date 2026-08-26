@@ -107,6 +107,14 @@ import {
   deleteModelCacheDatabases,
   deleteAllModelCaches,
 } from "./lib/cache.js";
+import {
+  createRoundtableSession,
+  runRoundtable,
+} from "./lib/council-core.js";
+
+import {
+  generateCouncilParticipant,
+} from "./lib/council-provider.js";
 
 "use strict";
 
@@ -267,6 +275,7 @@ const state = {
   loading: false,
   busy: false,
   abort: null,
+  roundtable: null,
   webgpuOk: false,
   webgpuBrowser: "other",
   webgpuChecking: true,
@@ -298,6 +307,15 @@ const state = {
   fileAutocompleteIndex: 0,
   fileAutocompleteMatches: [],
 };
+
+function createDefaultRoundtable() {
+  state.roundtable = createRoundtableSession({
+    participants: [],
+    maxRounds: 2,
+  });
+
+  return state.roundtable;
+}
 
 const $ = id => document.getElementById(id);
 
