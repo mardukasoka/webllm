@@ -309,9 +309,34 @@ const state = {
   fileAutocompleteMatches: [],
 };
 
+function createLocalCouncilParticipant() {
+  if (!state.model) {
+    return null;
+  }
+
+  const def = activeModelDef();
+
+  return {
+    id: def.id,
+    name: def.name || def.id,
+    model: def.id,
+    runtime: def.runtime,
+    modelInstance: state.model,
+  };
+}
+
 function createDefaultRoundtable() {
+  const participants = [];
+
+  const localParticipant =
+    createLocalCouncilParticipant();
+
+  if (localParticipant) {
+    participants.push(localParticipant);
+  }
+
   state.roundtable = createRoundtableSession({
-    participants: [],
+    participants,
     maxRounds: 2,
   });
 
