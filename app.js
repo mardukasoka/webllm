@@ -341,15 +341,44 @@ function createLocalCouncilParticipant() {
   };
 }
 
+function createRemoteCouncilParticipant() {
+  const def = loadedModelDef();
+
+  if (
+    !state.model ||
+    def?.runtime !== "remote"
+  ) {
+    return null;
+  }
+
+  return {
+    id: `remote:${def.id}`,
+    name: def.name || "Remote AI",
+    model: def.id,
+    runtime: "remote",
+    modelInstance: state.model,
+  };
+}
+
 function createDefaultRoundtable() {
   const participants = [];
 
-  const localParticipant =
-    createLocalCouncilParticipant();
+const localParticipant =
+  createLocalCouncilParticipant();
 
-  if (localParticipant) {
-    participants.push(localParticipant);
-  }
+const remoteParticipant =
+  createRemoteCouncilParticipant();
+
+if (localParticipant) {
+  participants.push(localParticipant);
+}
+
+if (
+  remoteParticipant &&
+  remoteParticipant.id !== localParticipant?.id
+) {
+  participants.push(remoteParticipant);
+}
 
   state.roundtable = createRoundtableSession({
     participants,
