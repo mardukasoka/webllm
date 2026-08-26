@@ -314,7 +314,11 @@ function createLocalCouncilParticipant() {
     return null;
   }
 
-  const def = activeModelDef();
+  const def = loadedModelDef();
+
+  if (!def || def.runtime === "remote") {
+    return null;
+  }
   const adapter =
     getRuntimeAdapter(def.runtime);
 
