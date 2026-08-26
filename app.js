@@ -317,6 +317,30 @@ function createDefaultRoundtable() {
   return state.roundtable;
 }
 
+async function runCurrentRoundtable(
+  userMessage,
+  { signal } = {}
+) {
+  const session =
+    state.roundtable ||
+    createDefaultRoundtable();
+
+  if (!session.participants.length) {
+    throw new Error(
+      "Roundtable has no participants."
+    );
+  }
+
+  return runRoundtable({
+    session,
+    userMessage,
+    generateForParticipant:
+      generateCouncilParticipant,
+    signal,
+  });
+}
+
+
 const $ = id => document.getElementById(id);
 
 const STEP_LABELS = {
