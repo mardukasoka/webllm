@@ -315,13 +315,29 @@ function createLocalCouncilParticipant() {
   }
 
   const def = activeModelDef();
+  const adapter =
+    getRuntimeAdapter(def.runtime);
 
   return {
     id: def.id,
     name: def.name || def.id,
     model: def.id,
     runtime: def.runtime,
-    modelInstance: state.model,
+
+    async generate({
+      messages,
+      tools,
+      signal,
+      maxNewTokens,
+    }) {
+      return adapter.generateAgent({
+        model: state.model,
+        messages,
+        tools,
+        signal,
+        maxNewTokens,
+      });
+    },
   };
 }
 
