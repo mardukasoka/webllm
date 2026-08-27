@@ -3500,6 +3500,26 @@ $("council-mode").addEventListener("change", e => {
     state.roundtable = null;
   }
 });
+
+$("roundtable-remote-btn").addEventListener(
+  "click",
+  async () => {
+    try {
+      const remote =
+        await loadRoundtableRemoteModel();
+
+      toast(
+        `Remote AI added: ${remote.model}`
+      );
+    } catch (err) {
+      toast(
+        err?.message ||
+        "Unable to add remote AI."
+      );
+    }
+  }
+);
+
 $("new-chat-btn").addEventListener("click", async () => {
   focusComposerInput($("user-input"));
   const inherited = inheritedSessionSettings();
