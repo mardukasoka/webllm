@@ -346,6 +346,21 @@ function createLocalCouncilParticipant() {
   };
 }
 
+async function loadRoundtableRemoteModel() {
+  const adapter =
+    getRuntimeAdapter("remote");
+
+  const remoteModel =
+    await adapter.loadModel();
+
+  state.roundtableRemoteModel =
+    remoteModel;
+
+  createDefaultRoundtable();
+
+  return remoteModel;
+}
+
 function createRemoteCouncilParticipant() {
   const remoteModel =
     state.roundtableRemoteModel;
