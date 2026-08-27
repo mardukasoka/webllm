@@ -3353,6 +3353,83 @@ async function runAssistantGeneration(session) {
   }
 }
 
+async function runRoundtableGeneration(
+  session,
+  userText
+) {
+  state.abort = new AbortController();
+
+  try {
+    const roundtable =
+      state.roundtable ||
+      createDefaultRoundtable();
+
+    const transcriptStart =
+      roundtable.transcript.length;
+
+    const result =
+      await runCurrentRoundtable(
+        userText,
+        {
+          signal: state.abort.signal,
+        }
+      );
+
+    const replies =
+      result.transcript
+        .slice(transcriptStart)
+        .filter(
+          message =>
+            message.role === "assistant"
+        );
+
+    for (const reply of replies) {
+      session.messages.push({
+        role: "assistant",
+        content:
+          `**${reply.speaker}**\n\n${reply.content}`,
+        meta: {
+          roundtable: true,
+          speaker: reply.speaker,
+          model: reply.model,
+        },
+      });
+    }
+
+    session.lastExecution = {
+      mode: "roundtable",
+      participants:
+        roundtable.participants.map(
+          participant =>
+            participant.name ||
+            participant.id
+        ),
+      completedAt: Date.now(),
+    };
+
+    await persistSession(session);
+
+    renderChat({
+      scrollForce: true,
+      animateLast: true,
+    });
+  } catch (err) {
+    console.error(err);
+
+    toast(
+      err?.message ||
+      "Roundtable generation failed."
+    );
+  } finally {
+    state.busy = false;
+    state.abort = null;
+
+    restoreIdleStatus();
+    updateComposerState();
+    flushQueuedDownload();
+  }
+}
+
 async function sendMessage() {
   const input = $("user-input");
   const text = input.value.trim();
@@ -3405,7 +3482,14 @@ async function sendMessage() {
   renderPendingFileRefs();
   renderChat({ scrollForce: true, animateLast: true });
 
+  if (state.councilMode === "roundtable") {
+  await runRoundtableGeneration(
+    session,
+    text
+  );
+} else {
   await runAssistantGeneration(session);
+}
 }
 
 /* ── Init ── */
