@@ -426,6 +426,9 @@ const localParticipant =
 const remoteParticipant =
   createRemoteCouncilParticipant();
 
+const anthropicParticipant =
+  createAnthropicCouncilParticipant();
+
 if (localParticipant) {
   participants.push(localParticipant);
 }
