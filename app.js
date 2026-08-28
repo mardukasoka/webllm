@@ -3651,6 +3651,25 @@ $("roundtable-remote-btn").addEventListener(
   }
 );
 
+$("roundtable-anthropic-btn").addEventListener(
+  "click",
+  async () => {
+    try {
+      const anthropic =
+        await loadRoundtableAnthropicModel();
+
+      toast(
+        `Claude added: ${anthropic.model}`
+      );
+    } catch (err) {
+      toast(
+        err?.message ||
+        "Unable to add Claude."
+      );
+    }
+  }
+);
+
 $("new-chat-btn").addEventListener("click", async () => {
   focusComposerInput($("user-input"));
   const inherited = inheritedSessionSettings();
