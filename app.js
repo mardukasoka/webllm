@@ -397,6 +397,26 @@ function createRemoteCouncilParticipant() {
   };
 }
 
+function createAnthropicCouncilParticipant() {
+  const anthropicModel =
+    state.roundtableAnthropicModel;
+
+  if (!anthropicModel) {
+    return null;
+  }
+
+  return {
+    id: `anthropic:${anthropicModel.model}`,
+    name:
+      anthropicModel.name ||
+      anthropicModel.model ||
+      "Claude",
+    model: anthropicModel.model,
+    runtime: "anthropic",
+    modelInstance: anthropicModel,
+  };
+}
+
 function createDefaultRoundtable() {
   const participants = [];
 
