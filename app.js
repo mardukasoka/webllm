@@ -440,6 +440,14 @@ if (
   participants.push(remoteParticipant);
 }
 
+if (
+  anthropicParticipant &&
+  anthropicParticipant.id !== localParticipant?.id &&
+  anthropicParticipant.id !== remoteParticipant?.id
+) {
+  participants.push(anthropicParticipant);
+}
+
   state.roundtable = createRoundtableSession({
     participants,
     maxRounds: 2,
