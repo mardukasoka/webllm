@@ -362,6 +362,21 @@ async function loadRoundtableRemoteModel() {
   return remoteModel;
 }
 
+async function loadRoundtableAnthropicModel() {
+  const adapter =
+    getRuntimeAdapter("anthropic");
+
+  const anthropicModel =
+    await adapter.loadModel();
+
+  state.roundtableAnthropicModel =
+    anthropicModel;
+
+  createDefaultRoundtable();
+
+  return anthropicModel;
+}
+
 function createRemoteCouncilParticipant() {
   const remoteModel =
     state.roundtableRemoteModel;
