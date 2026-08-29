@@ -3529,7 +3529,7 @@ async function sendMessage() {
   renderPendingFileRefs();
   renderChat({ scrollForce: true, animateLast: true });
 
-  if (state.councilMode === "roundtable") {
+  if (state.councilMode !== "solo") {
   await runRoundtableGeneration(
     session,
     text
