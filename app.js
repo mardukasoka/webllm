@@ -3622,6 +3622,7 @@ $("load-model-btn").addEventListener("click", loadModel);
 $("load-model-btn-hero").addEventListener("click", loadModel);
 $("council-mode").addEventListener("change", e => {
   state.councilMode = e.target.value;
+  e.target.classList.toggle("primary", state.councilMode !== "solo");
 
   if (state.councilMode !== "solo") {
     createDefaultRoundtable();
