@@ -276,9 +276,10 @@ const state = {
   busy: false,
   abort: null,
   roundtable: null,
-roundtableRemoteModel: null,
-roundtableAnthropicModel: null,
-councilMode: "solo",
+  roundtableRemoteModel: null,
+  roundtableAnthropicModel: null,
+  councilRemovedParticipantIds: new Set(),
+  councilMode: "solo",
   webgpuOk: false,
   webgpuBrowser: "other",
   webgpuChecking: true,
@@ -358,6 +359,10 @@ async function loadRoundtableRemoteModel() {
     remoteModel;
 
   createDefaultRoundtable();
+  addCouncilParticipant(
+    createRemoteCouncilParticipant(),
+    { explicit: true }
+  );
 
   return remoteModel;
 }
@@ -373,6 +378,10 @@ async function loadRoundtableAnthropicModel() {
     anthropicModel;
 
   createDefaultRoundtable();
+  addCouncilParticipant(
+    createAnthropicCouncilParticipant(),
+    { explicit: true }
+  );
 
   return anthropicModel;
 }
@@ -417,41 +426,135 @@ function createAnthropicCouncilParticipant() {
   };
 }
 
+function renderCouncilParticipants() {
+  const panel = $("council-participants-panel");
+  const list = $("council-participants-list");
+  const count = $("council-participants-count");
+
+  if (!panel || !list) return;
+
+  const isCouncilMode = state.councilMode !== "solo";
+  panel.hidden = !isCouncilMode;
+  if (!isCouncilMode) return;
+
+  const participants = state.roundtable?.participants || [];
+  if (count) count.textContent = participants.length;
+
+  list.replaceChildren();
+
+  if (!participants.length) {
+    const empty = document.createElement("div");
+    empty.className = "council-participants-empty";
+    empty.textContent = "No Council participants selected.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const participant of participants) {
+    const row = document.createElement("div");
+    row.className = "council-participant";
+    row.setAttribute("role", "listitem");
+
+    const copy = document.createElement("div");
+    copy.className = "council-participant-copy";
+
+    const name = document.createElement("strong");
+    name.className = "council-participant-name";
+    name.textContent = participant.name || participant.id;
+
+    const meta = document.createElement("span");
+    meta.className = "council-participant-meta";
+    meta.textContent = [
+      participant.runtime || "unknown runtime",
+      participant.model || participant.id,
+    ].join(" · ");
+
+    copy.append(name, meta);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "icon-btn danger";
+    remove.setAttribute(
+      "aria-label",
+      `Remove ${participant.name || participant.id} from Council`
+    );
+    remove.title = "Remove from Council";
+    remove.disabled = state.busy;
+    setIcon(remove, "close");
+    remove.addEventListener("click", () => {
+      removeCouncilParticipant(participant.id);
+    });
+
+    row.append(copy, remove);
+    list.appendChild(row);
+  }
+}
+
+function addCouncilParticipant(
+  participant,
+  { explicit = false, render = true } = {}
+) {
+  if (!participant?.id) return null;
+
+  if (explicit) {
+    state.councilRemovedParticipantIds.delete(participant.id);
+  } else if (
+    state.councilRemovedParticipantIds.has(participant.id)
+  ) {
+    return state.roundtable;
+  }
+
+  if (!state.roundtable) {
+    state.councilRemovedParticipantIds.clear();
+    state.roundtable = createRoundtableSession({
+      participants: [],
+      maxRounds: 2,
+    });
+  }
+
+  if (
+    !state.roundtable.participants.some(
+      existing => existing.id === participant.id
+    )
+  ) {
+    state.roundtable.participants.push(participant);
+  }
+
+  if (render) renderCouncilParticipants();
+  return state.roundtable;
+}
+
+function removeCouncilParticipant(participantId) {
+  if (state.busy || !state.roundtable) return;
+
+  state.councilRemovedParticipantIds.add(participantId);
+  state.roundtable.participants =
+    state.roundtable.participants.filter(
+      participant => participant.id !== participantId
+    );
+  renderCouncilParticipants();
+}
+
 function createDefaultRoundtable() {
-  const participants = [];
+  const availableParticipants = [
+    createLocalCouncilParticipant(),
+    createRemoteCouncilParticipant(),
+    createAnthropicCouncilParticipant(),
+  ].filter(Boolean);
 
-const localParticipant =
-  createLocalCouncilParticipant();
+  if (!state.roundtable) {
+    state.councilRemovedParticipantIds.clear();
+    state.roundtable = createRoundtableSession({
+      participants: [],
+      maxRounds: 2,
+    });
+  }
 
-const remoteParticipant =
-  createRemoteCouncilParticipant();
+  for (const participant of availableParticipants) {
+    addCouncilParticipant(participant, { render: false });
+  }
 
-const anthropicParticipant =
-  createAnthropicCouncilParticipant();
-
-if (localParticipant) {
-  participants.push(localParticipant);
-}
-
-if (
-  remoteParticipant &&
-  remoteParticipant.id !== localParticipant?.id
-) {
-  participants.push(remoteParticipant);
-}
-
-if (
-  anthropicParticipant &&
-  anthropicParticipant.id !== localParticipant?.id &&
-  anthropicParticipant.id !== remoteParticipant?.id
-) {
-  participants.push(anthropicParticipant);
-}
-
-  state.roundtable = createRoundtableSession({
-    participants,
-    maxRounds: 2,
-  });
+  renderCouncilParticipants();
 
   return state.roundtable;
 }
@@ -1407,6 +1510,7 @@ const loadDisabled =
 
   updateEmptyLoader();
   updateStorageButtons();
+  renderCouncilParticipants();
 }
 
 async function loadModel() {
@@ -1447,6 +1551,9 @@ if (def.runtime !== "bonsai" && def.runtime !== "remote") {
     setProgressImmediate(1, "Model ready");
     state.modelLoadSecs = ((performance.now() - started) / 1000).toFixed(1);
     state.loadedModelId = def.id;
+    if (state.councilMode !== "solo") {
+      createDefaultRoundtable();
+    }
     const loadedMaxNewTokens = effectiveMaxNewTokens(state.maxNewTokens, def);
     if (loadedMaxNewTokens !== state.maxNewTokens) {
       state.maxNewTokens = loadedMaxNewTokens;
@@ -3631,6 +3738,8 @@ $("council-mode").addEventListener("change", e => {
   if (state.councilMode === "solo") {
     state.roundtable = null;
   }
+
+  renderCouncilParticipants();
 });
 
 $("roundtable-remote-btn").addEventListener(

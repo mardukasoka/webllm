@@ -510,6 +510,39 @@
   font-size: 12px;
 }
 
+  #council-participants-panel {
+    display: none; flex: none; padding: 10px 24px;
+    border-bottom: 1px solid var(--border-soft);
+    background: color-mix(in srgb, var(--bg-chat) 92%, transparent);
+  }
+  #council-participants-panel:not([hidden]) { display: block; }
+  .council-participants-heading {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 7px;
+    font-size: 11px; font-weight: 700; color: var(--text-secondary);
+  }
+  .council-participants-list {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .council-participant {
+    display: flex; align-items: center; gap: 8px; min-width: 180px;
+    padding: 7px 8px 7px 10px; border: 1px solid var(--border-soft);
+    border-radius: var(--radius-xs); background: var(--surface);
+  }
+  .council-participant-copy {
+    display: flex; flex-direction: column; min-width: 0; flex: 1;
+  }
+  .council-participant-name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 12px; color: var(--text);
+  }
+  .council-participant-meta {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--mono); font-size: 10px; color: var(--text-muted);
+  }
+  .council-participants-empty {
+    font-size: 12px; color: var(--text-muted);
+  }
+
   .theme-toggle-btn {
     flex: none; appearance: none; border: 1px solid var(--border); background: var(--surface);
     border-radius: var(--radius-xs); width: 36px; height: 36px; cursor: pointer;
@@ -903,6 +936,10 @@
     order: 10;
   }
 
+  #council-participants-panel {
+    padding-left: 16px; padding-right: 16px;
+  }
+
   #sidebar { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: var(--shadow-lg); }
     #sidebar.open { transform: translateX(0); }
     .menu-btn { display: grid; place-items: center; }
@@ -1096,6 +1133,13 @@
 
     <div id="banner-top-mount"></div>
     <div id="load-bar-wrap"><div id="load-bar"></div></div>
+    <div id="council-participants-panel" hidden>
+      <div class="council-participants-heading">
+        <span>Council participants</span>
+        <span class="conv-count" id="council-participants-count">0</span>
+      </div>
+      <div id="council-participants-list" class="council-participants-list" role="list" aria-live="polite"></div>
+    </div>
 
     <div id="chat-scroll">
       <div id="chat-inner">
