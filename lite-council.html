@@ -71,12 +71,12 @@
         <summary>Configure</summary>
         <div class="config">
           <div class="config-grid">
-            <label><span>OpenAI model</span><input id="gpt-model" value="gpt-5"></label>
+            <label><span>OpenAI model</span><input id="gpt-model" value="gpt-5.6-sol"></label>
             <label><span>Gemini model</span><input id="gemini-model" value="gemini-3.8-flash"></label>
             <label><span>OpenAI API key</span><input id="gpt-key" type="password" autocomplete="off"></label>
             <label><span>Gemini API key</span><input id="gemini-key" type="password" autocomplete="off"></label>
           </div>
-          <p class="note">Keys stay only in this page's memory and are cleared on reload. The page sends the shared transcript directly to each provider.</p>
+          <p class="note">Development bridge only: keys are kept in page memory and cleared on reload, but browser-side keys are not secret from page scripts, extensions, or developer tools.</p>
           <a class="quiet-link" href="https://github.com/mardukasoka/webllm/edit/master/lite-council.html" target="_blank" rel="noreferrer">Edit this page in GitHub</a>
         </div>
       </details>
@@ -86,10 +86,13 @@
 
 <script type="module">
 import {
-  buildCouncilMessages,
-  buildSynthesisMessages,
-  extractAssistantText,
+  buildCanonicalRequest,
+  getCouncilSystemInstruction,
 } from "./lib/lite-council-core.js";
+import {
+  callOpenAIResponses,
+  callGeminiGenerateContent,
+} from "./lib/lite-council-provider.js";
 
 const els = {
   form: document.querySelector("#council-form"),
@@ -101,11 +104,6 @@ const els = {
   geminiModel: document.querySelector("#gemini-model"),
   gptKey: document.querySelector("#gpt-key"),
   geminiKey: document.querySelector("#gemini-key"),
-};
-
-const endpoints = {
-  gpt: "https://api.openai.com/v1/chat/completions",
-  gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
 };
 
 function addMessage(name, content, kind) {
@@ -120,25 +118,31 @@ function addMessage(name, content, kind) {
   article.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
-async function callProvider({ endpoint, apiKey, model, messages }) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ model, messages }),
+function resultText(settlement, provider) {
+  return settlement.status === "fulfilled"
+    ? settlement.value
+    : `[${provider} execution failure] ${settlement.reason?.message || String(settlement.reason)}`;
+}
+
+async function runRound({ round, prompt, atlasContext, sharedTranscript, gpt, gemini }) {
+  const canonicalRequest = buildCanonicalRequest({
+    userPrompt: prompt,
+    atlasContext,
+    sharedTranscript,
   });
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`${response.status} ${detail || response.statusText}`);
-  }
-
-  const payload = await response.json();
-  const text = extractAssistantText(payload);
-  if (!text) throw new Error("Provider returned no assistant text.");
-  return text;
+  return Promise.allSettled([
+    callOpenAIResponses({
+      ...gpt,
+      instructions: getCouncilSystemInstruction("gpt", round),
+      canonicalRequest,
+    }),
+    callGeminiGenerateContent({
+      ...gemini,
+      systemInstruction: getCouncilSystemInstruction("gemini", round),
+      canonicalRequest,
+    }),
+  ]);
 }
 
 async function deliberate(prompt) {
@@ -150,25 +154,30 @@ async function deliberate(prompt) {
   }
 
   const gpt = {
-    endpoint: endpoints.gpt,
     apiKey: gptKey,
-    model: els.gptModel.value.trim() || "gpt-5",
+    model: els.gptModel.value.trim() || "gpt-5.6-sol",
   };
   const gemini = {
-    endpoint: endpoints.gemini,
     apiKey: geminiKey,
     model: els.geminiModel.value.trim() || "gemini-3.8-flash",
   };
 
+  const atlasContext = null;
   const base = [{ role: "user", name: "user", content: prompt }];
   addMessage("You", prompt, "user");
 
   els.status.textContent = "Round 1";
-  const [gptFirst, geminiFirst] = await Promise.all([
-    callProvider({ ...gpt, messages: buildCouncilMessages({ participant: "gpt", round: 1, transcript: base }) }),
-    callProvider({ ...gemini, messages: buildCouncilMessages({ participant: "gemini", round: 1, transcript: base }) }),
-  ]);
+  const roundOneSettlements = await runRound({
+    round: 1,
+    prompt,
+    atlasContext,
+    sharedTranscript: null,
+    gpt,
+    gemini,
+  });
 
+  const gptFirst = resultText(roundOneSettlements[0], "OpenAI");
+  const geminiFirst = resultText(roundOneSettlements[1], "Gemini");
   addMessage("GPT · Round 1", gptFirst, "gpt");
   addMessage("Gemini · Round 1", geminiFirst, "gemini");
 
@@ -179,11 +188,17 @@ async function deliberate(prompt) {
   ];
 
   els.status.textContent = "Round 2";
-  const [gptSecond, geminiSecond] = await Promise.all([
-    callProvider({ ...gpt, messages: buildCouncilMessages({ participant: "gpt", round: 2, transcript: roundOne }) }),
-    callProvider({ ...gemini, messages: buildCouncilMessages({ participant: "gemini", round: 2, transcript: roundOne }) }),
-  ]);
+  const roundTwoSettlements = await runRound({
+    round: 2,
+    prompt,
+    atlasContext,
+    sharedTranscript: roundOne,
+    gpt,
+    gemini,
+  });
 
+  const gptSecond = resultText(roundTwoSettlements[0], "OpenAI");
+  const geminiSecond = resultText(roundTwoSettlements[1], "Gemini");
   addMessage("GPT · Round 2", gptSecond, "gpt");
   addMessage("Gemini · Round 2", geminiSecond, "gemini");
 
@@ -193,12 +208,24 @@ async function deliberate(prompt) {
     { role: "assistant", name: "Gemini", content: geminiSecond },
   ];
 
-  els.status.textContent = "Synthesizing";
-  const synthesis = await callProvider({
-    ...gpt,
-    messages: buildSynthesisMessages(fullTranscript),
+  els.status.textContent = "OpenAI synthesis";
+  const synthesisRequest = buildCanonicalRequest({
+    userPrompt: "Separate shared conclusions, unresolved disagreements, and proposed next actions. Preserve disagreements; do not invent consensus.",
+    atlasContext,
+    sharedTranscript: fullTranscript,
   });
-  addMessage("Council synthesis", synthesis, "synthesis");
+
+  try {
+    const synthesis = await callOpenAIResponses({
+      ...gpt,
+      instructions: "You are an attributed synthesis node. Summarize the immutable Council record without presenting your interpretation as an objective Council verdict.",
+      canonicalRequest: synthesisRequest,
+    });
+    addMessage("OpenAI synthesis of Council record", synthesis, "synthesis");
+  } catch (error) {
+    addMessage("OpenAI synthesis failed", error instanceof Error ? error.message : String(error), "synthesis");
+  }
+
   els.status.textContent = "GPT + Gemini";
 }
 
