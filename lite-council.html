@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lite Council</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0b0d12;
+    --panel: #121620;
+    --line: #252b38;
+    --text: #f2f4f8;
+    --muted: #9aa3b2;
+    --accent: #8b93ff;
+    --gpt: #dbeafe;
+    --gemini: #f3e8ff;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); }
+  main { width: min(900px, 100%); margin: 0 auto; padding: 18px 14px 28px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+  .status { color: var(--muted); font-size: 12px; }
+  #transcript { display: grid; gap: 10px; margin-bottom: 16px; }
+  .message { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); padding: 12px 13px; }
+  .message h2 { margin: 0 0 6px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+  .message p { margin: 0; white-space: pre-wrap; line-height: 1.55; font-size: 14px; }
+  .message.gpt h2 { color: var(--gpt); }
+  .message.gemini h2 { color: var(--gemini); }
+  .message.user h2, .message.synthesis h2 { color: var(--accent); }
+  form { position: sticky; bottom: 0; background: linear-gradient(180deg, transparent, var(--bg) 18%); padding-top: 18px; }
+  textarea, input { width: 100%; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 12px; font: inherit; }
+  textarea { min-height: 96px; resize: vertical; padding: 12px; }
+  input { padding: 9px 10px; }
+  .composer-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  button { border: 0; border-radius: 10px; padding: 10px 14px; font: 600 14px inherit; cursor: pointer; }
+  #run { background: var(--accent); color: #0b0d12; }
+  #run:disabled { opacity: .45; cursor: wait; }
+  details { margin-left: auto; color: var(--muted); font-size: 12px; }
+  summary { cursor: pointer; user-select: none; }
+  .config { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--panel); display: grid; gap: 9px; }
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  label { display: grid; gap: 4px; }
+  label span { font-size: 11px; color: var(--muted); }
+  .quiet-link { color: var(--muted); text-decoration: none; font-size: 12px; }
+  .quiet-link:hover { color: var(--text); }
+  .note { font-size: 11px; line-height: 1.4; color: var(--muted); margin: 0; }
+  @media (max-width: 640px) {
+    main { padding: 12px 10px 22px; }
+    .config-grid { grid-template-columns: 1fr; }
+    .composer-row { align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Lite Council</h1>
+    <div class="status" id="status">GPT + Gemini</div>
+  </header>
+
+  <section id="transcript" aria-live="polite"></section>
+
+  <form id="council-form">
+    <textarea id="prompt" placeholder="Ask the Council…" required></textarea>
+    <div class="composer-row">
+      <button id="run" type="submit">Run Council</button>
+      <details id="settings">
+        <summary>Configure</summary>
+        <div class="config">
+          <div class="config-grid">
+            <label><span>OpenAI model</span><input id="gpt-model" value="gpt-5"></label>
+            <label><span>Gemini model</span><input id="gemini-model" value="gemini-3.8-flash"></label>
+            <label><span>OpenAI API key</span><input id="gpt-key" type="password" autocomplete="off"></label>
+            <label><span>Gemini API key</span><input id="gemini-key" type="password" autocomplete="off"></label>
+          </div>
+          <p class="note">Keys stay only in this page's memory and are cleared on reload. The page sends the shared transcript directly to each provider.</p>
+          <a class="quiet-link" href="https://github.com/mardukasoka/webllm/edit/master/lite-council.html" target="_blank" rel="noreferrer">Edit this page in GitHub</a>
+        </div>
+      </details>
+    </div>
+  </form>
+</main>
+
+<script type="module">
+import {
+  buildCouncilMessages,
+  buildSynthesisMessages,
+  extractAssistantText,
+} from "./lib/lite-council-core.js";
+
+const els = {
+  form: document.querySelector("#council-form"),
+  prompt: document.querySelector("#prompt"),
+  run: document.querySelector("#run"),
+  transcript: document.querySelector("#transcript"),
+  status: document.querySelector("#status"),
+  gptModel: document.querySelector("#gpt-model"),
+  geminiModel: document.querySelector("#gemini-model"),
+  gptKey: document.querySelector("#gpt-key"),
+  geminiKey: document.querySelector("#gemini-key"),
+};
+
+const endpoints = {
+  gpt: "https://api.openai.com/v1/chat/completions",
+  gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+};
+
+function addMessage(name, content, kind) {
+  const article = document.createElement("article");
+  article.className = `message ${kind}`;
+  const heading = document.createElement("h2");
+  heading.textContent = name;
+  const body = document.createElement("p");
+  body.textContent = content;
+  article.append(heading, body);
+  els.transcript.append(article);
+  article.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+
+async function callProvider({ endpoint, apiKey, model, messages }) {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, messages }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`${response.status} ${detail || response.statusText}`);
+  }
+
+  const payload = await response.json();
+  const text = extractAssistantText(payload);
+  if (!text) throw new Error("Provider returned no assistant text.");
+  return text;
+}
+
+async function deliberate(prompt) {
+  const gptKey = els.gptKey.value.trim();
+  const geminiKey = els.geminiKey.value.trim();
+  if (!gptKey || !geminiKey) {
+    document.querySelector("#settings").open = true;
+    throw new Error("Add both provider API keys in Configure.");
+  }
+
+  const gpt = {
+    endpoint: endpoints.gpt,
+    apiKey: gptKey,
+    model: els.gptModel.value.trim() || "gpt-5",
+  };
+  const gemini = {
+    endpoint: endpoints.gemini,
+    apiKey: geminiKey,
+    model: els.geminiModel.value.trim() || "gemini-3.8-flash",
+  };
+
+  const base = [{ role: "user", name: "user", content: prompt }];
+  addMessage("You", prompt, "user");
+
+  els.status.textContent = "Round 1";
+  const [gptFirst, geminiFirst] = await Promise.all([
+    callProvider({ ...gpt, messages: buildCouncilMessages({ participant: "gpt", round: 1, transcript: base }) }),
+    callProvider({ ...gemini, messages: buildCouncilMessages({ participant: "gemini", round: 1, transcript: base }) }),
+  ]);
+
+  addMessage("GPT · Round 1", gptFirst, "gpt");
+  addMessage("Gemini · Round 1", geminiFirst, "gemini");
+
+  const roundOne = [
+    ...base,
+    { role: "assistant", name: "GPT", content: gptFirst },
+    { role: "assistant", name: "Gemini", content: geminiFirst },
+  ];
+
+  els.status.textContent = "Round 2";
+  const [gptSecond, geminiSecond] = await Promise.all([
+    callProvider({ ...gpt, messages: buildCouncilMessages({ participant: "gpt", round: 2, transcript: roundOne }) }),
+    callProvider({ ...gemini, messages: buildCouncilMessages({ participant: "gemini", round: 2, transcript: roundOne }) }),
+  ]);
+
+  addMessage("GPT · Round 2", gptSecond, "gpt");
+  addMessage("Gemini · Round 2", geminiSecond, "gemini");
+
+  const fullTranscript = [
+    ...roundOne,
+    { role: "assistant", name: "GPT", content: gptSecond },
+    { role: "assistant", name: "Gemini", content: geminiSecond },
+  ];
+
+  els.status.textContent = "Synthesizing";
+  const synthesis = await callProvider({
+    ...gpt,
+    messages: buildSynthesisMessages(fullTranscript),
+  });
+  addMessage("Council synthesis", synthesis, "synthesis");
+  els.status.textContent = "GPT + Gemini";
+}
+
+els.form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const prompt = els.prompt.value.trim();
+  if (!prompt) return;
+
+  els.run.disabled = true;
+  try {
+    await deliberate(prompt);
+    els.prompt.value = "";
+  } catch (error) {
+    els.status.textContent = "Configuration / provider error";
+    addMessage("Council", error instanceof Error ? error.message : String(error), "synthesis");
+  } finally {
+    els.run.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
