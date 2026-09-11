@@ -6,6 +6,7 @@ import { runRepoAction } from './runner.js';
 import { planMap3dRequest } from './map3d.js';
 import { describeAtomModel } from './atoms.js';
 import { getGame, listGames, listRulesets } from './games.js';
+import { cancelTask, getTaskResult, getTaskStatus, submitTask } from './agents.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -172,6 +173,84 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'agents.submit',
+    {
+      description: 'Create and start one bounded in-memory task using a predefined allowlisted repository action.',
+      inputSchema: z.object({
+        taskType: z.enum(['test', 'lint', 'typecheck', 'debug', 'audit']),
+        repo: z.string().min(1),
+        writeMode: z.enum(['read-only', 'branch-only']),
+        maxAgents: z.number().int().min(1).max(4),
+        timeoutMinutes: z.number().int().min(1).max(60)
+      }).strict()
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(submitTask(input), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'agents.status',
+    {
+      description: 'Return metadata and current state for one in-memory Atlas task.',
+      inputSchema: z.object({ taskId: z.string().min(1) }).strict()
+    },
+    async ({ taskId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getTaskStatus(taskId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'agents.result',
+    {
+      description: 'Return bounded output and result metadata after an Atlas task reaches a terminal state.',
+      inputSchema: z.object({ taskId: z.string().min(1) }).strict()
+    },
+    async ({ taskId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getTaskResult(taskId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'agents.cancel',
+    {
+      description: 'Cancel a queued Atlas task; running subprocesses are not killed in v0.1.',
+      inputSchema: z.object({ taskId: z.string().min(1) }).strict()
+    },
+    async ({ taskId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(cancelTask(taskId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'atlas.status',
     {
       description: 'Report Atlas MCP configuration and which repo root is active.',
@@ -185,7 +264,17 @@ serveStdio(() => {
           repoRootConfigured: Boolean(process.env.ATLAS_REPO_ROOT),
           registeredRepos: repos.length,
           executableActions: repos.reduce((sum, repo) => sum + Object.keys(repo.actions).length, 0),
-          structuredTools: ['map3d.plan', 'atoms.describe', 'games.list', 'games.get', 'games.rulesets']
+          structuredTools: [
+            'map3d.plan',
+            'atoms.describe',
+            'games.list',
+            'games.get',
+            'games.rulesets',
+            'agents.submit',
+            'agents.status',
+            'agents.result',
+            'agents.cancel'
+          ]
         }, null, 2)
       }]
     })

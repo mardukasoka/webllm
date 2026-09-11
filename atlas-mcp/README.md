@@ -11,6 +11,8 @@ A small MCP gateway for exposing selected Atlas repositories to the Council thro
 - Output is bounded and actions time out.
 - Structured tools validate inputs and preserve provenance/epistemic distinctions.
 - Repositories may be registered before they gain executable actions.
+- The MCP is a control plane: task execution still routes through reviewed, allowlisted actions.
+- v0.1 agent tasks are in-memory, have bounded lifetimes, and do not create autonomous agents.
 
 ## Current tools
 
@@ -35,6 +37,31 @@ A small MCP gateway for exposing selected Atlas repositories to the Council thro
 - `games.rulesets` — return attributed historical/reconstructed rules profiles, optionally for one game.
 
 The Games tools are query-only in v0.1. Move generation, move application and engine evaluation are intentionally not exposed until their rules-engine adapter boundaries are verified.
+
+### Agent control plane
+
+- `agents.submit` — create a bounded in-memory task using a predefined repository/action mapping.
+- `agents.status` — inspect task metadata and state.
+- `agents.result` — retrieve bounded output after a task reaches a terminal state.
+- `agents.cancel` — cancel queued tasks; running subprocesses are not killed in v0.1.
+
+Tasks accept only a task type, registered repository, write-mode metadata, agent-count policy, and timeout metadata. They do not accept commands, arguments, paths, URLs, credentials, or scripts. `maxAgents` is a policy field only; v0.1 does not spawn LLMs or agent swarms. `branch-only` is metadata only and no Git writes are implemented.
+
+Persistence is intentionally deferred. Tasks are lost when the MCP process restarts. A future worker/scheduler architecture can add durable coordination without changing the allowlisted action boundary:
+
+```text
+Council
+   |
+Atlas MCP
+   |
+agents.*
+   |
+Allowlisted Task Runner
+   |
+Repo/Test/Audit capability
+```
+
+There is no continuous scheduler, persistent background worker, remote AI provider, or public MCP transport in v0.1.
 
 ## Initial registry
 
