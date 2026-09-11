@@ -3,6 +3,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
 import { getRepo, repos } from './registry.js';
 import { runRepoAction } from './runner.js';
+import { planMap3dRequest } from './map3d.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -70,6 +71,30 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'map3d.plan',
+    {
+      description: 'Validate a small geographic bounding box and produce the OpenStreetMap/Overpass request plan used by the Map3D reconstruction pipeline.',
+      inputSchema: z.object({
+        north: z.number().min(-90).max(90),
+        south: z.number().min(-90).max(90),
+        east: z.number().min(-180).max(180),
+        west: z.number().min(-180).max(180)
+      })
+    },
+    async (bounds) => {
+      try {
+        const plan = planMap3dRequest(bounds);
+        return { content: [{ type: 'text', text: JSON.stringify(plan, null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'atlas.status',
     {
       description: 'Report Atlas MCP configuration and which repo root is active.',
@@ -82,7 +107,8 @@ serveStdio(() => {
           version: '0.1.0',
           repoRootConfigured: Boolean(process.env.ATLAS_REPO_ROOT),
           registeredRepos: repos.length,
-          executableActions: repos.reduce((sum, repo) => sum + Object.keys(repo.actions).length, 0)
+          executableActions: repos.reduce((sum, repo) => sum + Object.keys(repo.actions).length, 0),
+          structuredTools: ['map3d.plan']
         }, null, 2)
       }]
     })
