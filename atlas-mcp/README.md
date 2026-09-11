@@ -170,6 +170,27 @@ The reader uses the registered repository root, verifies containment and real pa
 
 The specialist does not write files, generate patches, execute commands, call remote providers, invoke models, retry tasks, create Git objects, or run autonomous loops.
 
+### Local Council review reasoner
+
+The browser-side `lib/council-review-reasoner.js` bridge consumes a prepared Council review packet through the existing local Council path:
+
+```text
+createLocalCouncilParticipant()
+        |
+        v
+getRuntimeAdapter(def.runtime).generateAgent
+        |
+        v
+generateCouncilParticipant()
+        |
+        v
+bounded review packet → proposal candidate
+```
+
+For the configured default local model, `lfm2`, this reaches `generateLfmAssistant` through the existing `lfm2` runtime adapter. The reasoner supplies one fixed read-only system instruction, passes no callable tools, makes at most one inference attempt, conservatively parses raw or fully fenced JSON, and returns a structured unavailable or invalid-output result when local inference cannot produce a proposal candidate. It does not fall back to a remote or Anthropic provider.
+
+The reasoner accepts only the packet produced by `council.prepare_review`; it does not accept a caller system prompt, repository root, filesystem access, credentials, shell access, URLs, environment variables or MCP execution capabilities. Its output remains a candidate until `council.record_proposal` performs the authoritative validation. This increment keeps the bridge callable from code and tests only because the browser has no existing MCP transport; no patch-apply control is exposed in the UI.
+
 ### Council review boundary
 
 - `council.prepare_review` — create a provenance-bound model-facing review packet from one completed specialist inspection.
