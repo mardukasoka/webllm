@@ -4,6 +4,7 @@ import * as z from 'zod/v4';
 import { getRepo, repos } from './registry.js';
 import { runRepoAction } from './runner.js';
 import { planMap3dRequest } from './map3d.js';
+import { describeAtomModel } from './atoms.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -95,6 +96,30 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'atoms.describe',
+    {
+      description: 'Describe the current lightweight hydrogen/muonic-hydrogen visualization model state without invoking the browser renderer.',
+      inputSchema: z.object({
+        particle: z.enum(['electron', 'muon']),
+        n: z.number().int().min(1).max(6),
+        l: z.number().int().min(0).max(5),
+        m: z.number().int().min(-5).max(5)
+      })
+    },
+    async (input) => {
+      try {
+        const model = describeAtomModel(input);
+        return { content: [{ type: 'text', text: JSON.stringify(model, null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'atlas.status',
     {
       description: 'Report Atlas MCP configuration and which repo root is active.',
@@ -108,7 +133,7 @@ serveStdio(() => {
           repoRootConfigured: Boolean(process.env.ATLAS_REPO_ROOT),
           registeredRepos: repos.length,
           executableActions: repos.reduce((sum, repo) => sum + Object.keys(repo.actions).length, 0),
-          structuredTools: ['map3d.plan']
+          structuredTools: ['map3d.plan', 'atoms.describe']
         }, null, 2)
       }]
     })
