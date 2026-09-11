@@ -170,6 +170,39 @@ The reader uses the registered repository root, verifies containment and real pa
 
 The specialist does not write files, generate patches, execute commands, call remote providers, invoke models, retry tasks, create Git objects, or run autonomous loops.
 
+### Council review boundary
+
+- `council.prepare_review` — create a provenance-bound model-facing review packet from one completed specialist inspection.
+- `council.review_status` — inspect one in-memory review, its evidence digest, validation state and stored proposal.
+- `council.record_proposal` — validate and store one structured proposal against the review evidence.
+
+The Council boundary is intentionally split from reasoning and remediation:
+
+```text
+specialist evidence
+        |
+        v
+Council review packet
+        |
+        v
+external Council reasoning
+        |
+        v
+structured proposal
+        |
+        v
+MCP validation
+        |
+        v
+stored proposal only
+```
+
+The review packet contains only the registered repository id, source task id, diagnostic category and summary, bounded stdout/stderr, static allowlisted file contents, task context, allowed files, fixed instructions and the proposal output schema. It does not expose repository roots, arbitrary paths, environment variables, credentials, shell commands, arbitrary URLs, provider fields or model fields.
+
+The model can reason; MCP can validate. Neither may apply a patch in v0.1. MCP does not invoke an LLM or provider in this layer. Proposals are limited to 4 inspected files, 12,000 UTF-8 bytes per unified diff, and 40,000 UTF-8 bytes total. Proposed paths must exactly match the review's allowlist. Diffs are checked for file headers and rejected for traversal, binary patches, renames, creation or deletion markers. Recommended tests are limited to the existing `npm test` and `npm run lint` actions.
+
+Every review stores a deterministic SHA-256 evidence digest covering the inspection id, source task id, allowed files, file contents, diagnostic category and diagnostic summary. A valid proposal moves the review from `prepared` to `proposed`; invalid proposals move it to `rejected`. No proposal is written, staged, tested, committed, pushed or applied.
+
 ## Initial registry
 
 - `map3d` — mapping — `build`

@@ -38,6 +38,13 @@ import {
   specialistInspectInputSchema,
   specialistLimits
 } from './specialist.js';
+import {
+  councilPrepareReviewInputSchema,
+  councilRecordProposalInputSchema,
+  getReviewStatus,
+  prepareReview,
+  recordProposal
+} from './council-review.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -384,6 +391,60 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'council.prepare_review',
+    {
+      description: 'Prepare a bounded provenance-linked review packet from one completed specialist inspection.',
+      inputSchema: councilPrepareReviewInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(prepareReview(input), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'council.review_status',
+    {
+      description: 'Return the state, provenance, digest, and bounded packet metadata for one in-memory Council review.',
+      inputSchema: z.object({ reviewId: z.string().min(1) }).strict()
+    },
+    async ({ reviewId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getReviewStatus(reviewId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'council.record_proposal',
+    {
+      description: 'Validate and store a proposal against one bounded Council review without applying or testing it.',
+      inputSchema: councilRecordProposalInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(recordProposal(input), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'scheduler.create',
     {
       description: 'Create an enabled in-memory recurring schedule for a predefined bounded task.',
@@ -530,6 +591,9 @@ serveStdio(() => {
             'specialist.inspect',
             'specialist.status',
             'specialist.result',
+            'council.prepare_review',
+            'council.review_status',
+            'council.record_proposal',
             'scheduler.create',
             'scheduler.list',
             'scheduler.get',
@@ -556,6 +620,14 @@ serveStdio(() => {
             fileSelection: 'static-allowlist',
             writes: false,
             ...specialistLimits()
+          },
+          councilReview: {
+            supported: true,
+            mode: 'proposal-validation-only',
+            inference: 'external',
+            writes: false,
+            maxProposalFiles: 4,
+            maxProposalBytes: 40_000
           }
         }, null, 2)
       }]
