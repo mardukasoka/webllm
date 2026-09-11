@@ -53,7 +53,17 @@ export const repos: RepoDefinition[] = [
     repo: 'mardukasoka/chess-atlas',
     relativePath: 'chess-atlas',
     domain: 'games',
-    actions: {}
+    actions: {
+      catalog: {
+        description: 'Read the canonical Chess Atlas game registry as JSON without starting the UI.',
+        command: 'node',
+        args: [
+          '-e',
+          "const r=require('./game-registry.js'); console.log(JSON.stringify(r.chronologicalGames(), null, 2));"
+        ],
+        timeoutMs: 15000
+      }
+    }
   },
   {
     id: 'atoms',
