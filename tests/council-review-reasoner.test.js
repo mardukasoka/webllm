@@ -4,6 +4,9 @@ import {
   parseCouncilProposal,
   reasonOverReviewPacket,
 } from "../lib/council-review-reasoner.js";
+import {
+  runLocalLfmCouncilReview,
+} from "../lib/council-review-browser.js";
 
 const allowedFiles = [
   "tests/models.test.js",
@@ -178,5 +181,55 @@ describe("council review reasoner", () => {
       attempts: 1,
     });
     expect(participant.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("records one proposal from a prepared packet through the loaded LFM boundary", async () => {
+    const packet = reviewPacket();
+    const packetBefore = JSON.stringify(packet);
+    const proposal = validProposal();
+    const participant = localParticipant(JSON.stringify(proposal));
+    const recordProposal = vi.fn(async input => ({
+      id: input.reviewId,
+      status: "proposed",
+      proposal: input.proposal,
+    }));
+    const reports = [];
+
+    const result = await runLocalLfmCouncilReview({
+      reviewPacket: packet,
+      evidenceDigest: "digest-1",
+      participant,
+      recordProposal,
+      log: report => reports.push(report),
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: "proposed",
+      attempts: 1,
+      proposal,
+      report: {
+        reviewId: "review-1",
+        evidenceDigest: "digest-1",
+        runtime: "lfm2",
+        model: "lfm2",
+        attempts: 1,
+        proposalSummary: proposal.summary,
+        confidence: "medium",
+        proposedPaths: [allowedFiles[0]],
+        testsRecommended: ["npm test"],
+        applyRequested: false,
+        recordProposalStatus: "proposed",
+      },
+    });
+    expect(participant.generate).toHaveBeenCalledTimes(1);
+    expect(participant.generate.mock.calls[0][0].tools).toEqual([]);
+    expect(recordProposal).toHaveBeenCalledTimes(1);
+    expect(recordProposal).toHaveBeenCalledWith({
+      reviewId: "review-1",
+      proposal,
+    });
+    expect(reports).toEqual([result.report]);
+    expect(JSON.stringify(packet)).toBe(packetBefore);
   });
 });
