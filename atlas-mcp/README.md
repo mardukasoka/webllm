@@ -128,6 +128,48 @@ The debugger does not:
 
 Scheduler integration is intentionally not automatic in this increment. A caller must explicitly invoke `debugger.create` for a failed task.
 
+### Read-only specialist
+
+- `specialist.inspect` — create a bounded repository evidence packet from one completed debugger diagnostic.
+- `specialist.status` — inspect the in-memory inspection state.
+- `specialist.result` — retrieve the completed evidence packet.
+
+The specialist preserves a deliberate epistemic boundary:
+
+```text
+task failure
+        |
+        v
+debugger
+        |
+        v
+bounded diagnosis
+        |
+        v
+specialist
+        |
+        v
+allowlisted repository evidence
+        |
+        v
+Council/model reasoning
+```
+
+The debugger determines what kind of failure occurred. The specialist gathers controlled evidence. Council/model reasoning comes later. This separation is intentional.
+
+`specialist.inspect` accepts only a completed diagnostic ID. It never accepts caller-supplied paths, globs, directories, commands, prompts, URLs, providers, models, scripts, or environment variables. For the known WebLLM test failure, the static allowlist is:
+
+```text
+tests/models.test.js
+tests/sessions.test.js
+lib/models.js
+lib/sessions.js
+```
+
+The reader uses the registered repository root, verifies containment and real paths, reads regular UTF-8 files only, and enforces a maximum of 6 files, 20,000 bytes per file, and 60,000 bytes total. Oversized files produce bounded excerpts with `truncated: true`. Lint and other categories return `inspection-unavailable` unless a safe static allowlist is added.
+
+The specialist does not write files, generate patches, execute commands, call remote providers, invoke models, retry tasks, create Git objects, or run autonomous loops.
+
 ## Initial registry
 
 - `map3d` — mapping — `build`

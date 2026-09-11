@@ -31,6 +31,13 @@ import {
   getDiagnosticResult,
   getDiagnosticStatus
 } from './debugger.js';
+import {
+  createInspection,
+  getInspectionResult,
+  getInspectionStatus,
+  specialistInspectInputSchema,
+  specialistLimits
+} from './specialist.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -323,6 +330,60 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'specialist.inspect',
+    {
+      description: 'Create a bounded read-only evidence packet from one completed debugger diagnostic.',
+      inputSchema: specialistInspectInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(createInspection(input), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'specialist.status',
+    {
+      description: 'Return the state and metadata for one in-memory specialist inspection.',
+      inputSchema: z.object({ inspectionId: z.string().min(1) }).strict()
+    },
+    async ({ inspectionId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getInspectionStatus(inspectionId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'specialist.result',
+    {
+      description: 'Return the completed bounded, read-only repository evidence packet.',
+      inputSchema: z.object({ inspectionId: z.string().min(1) }).strict()
+    },
+    async ({ inspectionId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getInspectionResult(inspectionId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'scheduler.create',
     {
       description: 'Create an enabled in-memory recurring schedule for a predefined bounded task.',
@@ -466,6 +527,9 @@ serveStdio(() => {
             'debugger.create',
             'debugger.status',
             'debugger.result',
+            'specialist.inspect',
+            'specialist.status',
+            'specialist.result',
             'scheduler.create',
             'scheduler.list',
             'scheduler.get',
@@ -485,6 +549,13 @@ serveStdio(() => {
             mode: 'proposal-only',
             persistence: 'in-memory',
             writes: false
+          },
+          specialist: {
+            supported: true,
+            mode: 'read-only',
+            fileSelection: 'static-allowlist',
+            writes: false,
+            ...specialistLimits()
           }
         }, null, 2)
       }]
