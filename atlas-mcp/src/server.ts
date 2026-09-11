@@ -5,6 +5,7 @@ import { getRepo, repos } from './registry.js';
 import { runRepoAction } from './runner.js';
 import { planMap3dRequest } from './map3d.js';
 import { describeAtomModel } from './atoms.js';
+import { getGame, listGames, listRulesets } from './games.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -120,6 +121,57 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'games.list',
+    {
+      description: 'List canonical Chess Atlas games in chronological order with provenance-facing metadata.',
+      inputSchema: z.object({
+        family: z.string().min(1).optional(),
+        timelineOnly: z.boolean().optional()
+      })
+    },
+    async (input) => {
+      try {
+        const games = await listGames(input);
+        return { content: [{ type: 'text', text: JSON.stringify(games, null, 2) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    'games.get',
+    {
+      description: 'Get one canonical Chess Atlas game record by stable game id.',
+      inputSchema: z.object({ gameId: z.string().min(1) })
+    },
+    async ({ gameId }) => {
+      try {
+        const game = await getGame(gameId);
+        return { content: [{ type: 'text', text: JSON.stringify(game, null, 2) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    'games.rulesets',
+    {
+      description: 'List attributed Chess Atlas ruleset profiles, optionally restricted to one game id. Reconstruction status remains explicit.',
+      inputSchema: z.object({ gameId: z.string().min(1).optional() })
+    },
+    async ({ gameId }) => {
+      try {
+        const rulesets = await listRulesets(gameId);
+        return { content: [{ type: 'text', text: JSON.stringify(rulesets, null, 2) }] };
+      } catch (error) {
+        return { isError: true, content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }] };
+      }
+    }
+  );
+
+  server.registerTool(
     'atlas.status',
     {
       description: 'Report Atlas MCP configuration and which repo root is active.',
@@ -133,7 +185,7 @@ serveStdio(() => {
           repoRootConfigured: Boolean(process.env.ATLAS_REPO_ROOT),
           registeredRepos: repos.length,
           executableActions: repos.reduce((sum, repo) => sum + Object.keys(repo.actions).length, 0),
-          structuredTools: ['map3d.plan', 'atoms.describe']
+          structuredTools: ['map3d.plan', 'atoms.describe', 'games.list', 'games.get', 'games.rulesets']
         }, null, 2)
       }]
     })
