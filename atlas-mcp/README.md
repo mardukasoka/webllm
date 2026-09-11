@@ -90,6 +90,44 @@ Tests / lint / audits
 
 There are no Git writes, remote AI calls, swarm workers, autonomous code edits, or continuous high-frequency loops. Future worker/scheduler persistence can be added behind this same bounded task boundary.
 
+### Proposal-only debugger
+
+- `debugger.create` — create an advisory diagnostic from one failed bounded task.
+- `debugger.status` — inspect diagnostic state and bounded evidence.
+- `debugger.result` — retrieve the completed diagnosis and remediation proposal.
+
+The debugger follows this explicit flow:
+
+```text
+failed bounded task
+        |
+        v
+debugger.create
+        |
+        v
+bounded task evidence
+        |
+        v
+deterministic diagnosis
+        |
+        v
+proposal only
+```
+
+Diagnostic evidence is limited to the task registry: repository, task type, mapped action, exit code, signal, timeout state, bounded stdout/stderr summaries, task error, and timestamps. The initial classifier recognizes timeout, test-failure, lint-failure, typecheck-failure, and generic execution-failure categories.
+
+The debugger does not:
+
+- write code or files;
+- perform Git operations, create branches, commits, or pull requests;
+- inspect arbitrary repository paths;
+- invoke a remote LLM or provider;
+- retry the failed task;
+- execute a proposed remediation;
+- recursively create more diagnostics.
+
+Scheduler integration is intentionally not automatic in this increment. A caller must explicitly invoke `debugger.create` for a failed task.
+
 ## Initial registry
 
 - `map3d` — mapping — `build`

@@ -25,6 +25,12 @@ import {
   scheduleInputSchema,
   MAX_SCHEDULES
 } from './scheduler.js';
+import {
+  createDiagnostic,
+  debuggerCreateInputSchema,
+  getDiagnosticResult,
+  getDiagnosticStatus
+} from './debugger.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -263,6 +269,60 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'debugger.create',
+    {
+      description: 'Create a proposal-only diagnostic from one failed bounded Atlas task.',
+      inputSchema: debuggerCreateInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(createDiagnostic(input), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'debugger.status',
+    {
+      description: 'Return the state and bounded evidence metadata for one in-memory diagnostic.',
+      inputSchema: z.object({ diagnosticId: z.string().min(1) }).strict()
+    },
+    async ({ diagnosticId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getDiagnosticStatus(diagnosticId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'debugger.result',
+    {
+      description: 'Return a completed proposal-only diagnosis and remediation proposal.',
+      inputSchema: z.object({ diagnosticId: z.string().min(1) }).strict()
+    },
+    async ({ diagnosticId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getDiagnosticResult(diagnosticId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'scheduler.create',
     {
       description: 'Create an enabled in-memory recurring schedule for a predefined bounded task.',
@@ -403,6 +463,9 @@ serveStdio(() => {
             'agents.status',
             'agents.result',
             'agents.cancel',
+            'debugger.create',
+            'debugger.status',
+            'debugger.result',
             'scheduler.create',
             'scheduler.list',
             'scheduler.get',
@@ -416,6 +479,12 @@ serveStdio(() => {
             persistence: 'in-memory',
             activeSchedules: activeScheduleCount(),
             maxSchedules: MAX_SCHEDULES
+          },
+          debugger: {
+            supported: true,
+            mode: 'proposal-only',
+            persistence: 'in-memory',
+            writes: false
           }
         }, null, 2)
       }]
