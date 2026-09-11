@@ -6,7 +6,25 @@ import { runRepoAction } from './runner.js';
 import { planMap3dRequest } from './map3d.js';
 import { describeAtomModel } from './atoms.js';
 import { getGame, listGames, listRulesets } from './games.js';
-import { cancelTask, getTaskResult, getTaskStatus, submitTask } from './agents.js';
+import {
+  agentTaskInputSchema,
+  cancelTask,
+  getTaskResult,
+  getTaskStatus,
+  submitTask
+} from './agents.js';
+import {
+  activeScheduleCount,
+  createSchedule,
+  disableSchedule,
+  enableSchedule,
+  getSchedule,
+  listSchedules,
+  removeSchedule,
+  runScheduleNow,
+  scheduleInputSchema,
+  MAX_SCHEDULES
+} from './scheduler.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
@@ -176,13 +194,7 @@ serveStdio(() => {
     'agents.submit',
     {
       description: 'Create and start one bounded in-memory task using a predefined allowlisted repository action.',
-      inputSchema: z.object({
-        taskType: z.enum(['test', 'lint', 'typecheck', 'debug', 'audit']),
-        repo: z.string().min(1),
-        writeMode: z.enum(['read-only', 'branch-only']),
-        maxAgents: z.number().int().min(1).max(4),
-        timeoutMinutes: z.number().int().min(1).max(60)
-      }).strict()
+      inputSchema: agentTaskInputSchema
     },
     async (input) => {
       try {
@@ -251,6 +263,123 @@ serveStdio(() => {
   );
 
   server.registerTool(
+    'scheduler.create',
+    {
+      description: 'Create an enabled in-memory recurring schedule for a predefined bounded task.',
+      inputSchema: scheduleInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(createSchedule(input), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'scheduler.list',
+    {
+      description: 'List in-memory Atlas schedules.',
+      inputSchema: z.object({}).strict()
+    },
+    async () => ({ content: [{ type: 'text', text: JSON.stringify(listSchedules(), null, 2) }] })
+  );
+
+  server.registerTool(
+    'scheduler.get',
+    {
+      description: 'Get one in-memory Atlas schedule.',
+      inputSchema: z.object({ scheduleId: z.string().min(1) }).strict()
+    },
+    async ({ scheduleId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getSchedule(scheduleId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'scheduler.enable',
+    {
+      description: 'Enable one in-memory Atlas schedule and recalculate its next run.',
+      inputSchema: z.object({ scheduleId: z.string().min(1) }).strict()
+    },
+    async ({ scheduleId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(enableSchedule(scheduleId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'scheduler.disable',
+    {
+      description: 'Disable one in-memory Atlas schedule and clear its timer.',
+      inputSchema: z.object({ scheduleId: z.string().min(1) }).strict()
+    },
+    async ({ scheduleId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(disableSchedule(scheduleId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'scheduler.run_now',
+    {
+      description: 'Run one schedule immediately through agents.submit and the existing allowlisted task mapping.',
+      inputSchema: z.object({ scheduleId: z.string().min(1) }).strict()
+    },
+    async ({ scheduleId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(runScheduleNow(scheduleId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    'scheduler.remove',
+    {
+      description: 'Remove one in-memory Atlas schedule and clear its timer.',
+      inputSchema: z.object({ scheduleId: z.string().min(1) }).strict()
+    },
+    async ({ scheduleId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(removeSchedule(scheduleId), null, 2) }] };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'atlas.status',
     {
       description: 'Report Atlas MCP configuration and which repo root is active.',
@@ -273,8 +402,21 @@ serveStdio(() => {
             'agents.submit',
             'agents.status',
             'agents.result',
-            'agents.cancel'
-          ]
+            'agents.cancel',
+            'scheduler.create',
+            'scheduler.list',
+            'scheduler.get',
+            'scheduler.enable',
+            'scheduler.disable',
+            'scheduler.run_now',
+            'scheduler.remove'
+          ],
+          scheduler: {
+            supported: true,
+            persistence: 'in-memory',
+            activeSchedules: activeScheduleCount(),
+            maxSchedules: MAX_SCHEDULES
+          }
         }, null, 2)
       }]
     })

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import * as z from 'zod/v4';
 import { getRepo, type RepoDefinition } from './registry.js';
 import { runRepoAction, type RunResult } from './runner.js';
 
@@ -31,20 +32,22 @@ export type AgentTask = {
   error: string | null;
 };
 
-export type AgentTaskInput = {
-  taskType: TaskType;
-  repo: string;
-  writeMode: WriteMode;
-  maxAgents: number;
-  timeoutMinutes: number;
-};
+export const agentTaskInputSchema = z.object({
+  taskType: z.enum(['test', 'lint', 'typecheck', 'debug', 'audit']),
+  repo: z.string().min(1),
+  writeMode: z.enum(['read-only', 'branch-only']),
+  maxAgents: z.number().int().min(1).max(4),
+  timeoutMinutes: z.number().int().min(1).max(60)
+}).strict();
+
+export type AgentTaskInput = z.infer<typeof agentTaskInputSchema>;
 
 type TaskAction = {
   repo: RepoDefinition;
   action: string;
 };
 
-type AgentTaskStatus = Omit<AgentTask, 'result'> & {
+export type AgentTaskStatus = Omit<AgentTask, 'result'> & {
   result: {
     available: true;
     repo: string;
@@ -56,6 +59,7 @@ type AgentTaskStatus = Omit<AgentTask, 'result'> & {
 };
 
 const tasks = new Map<string, AgentTask>();
+const taskSettledListeners = new Map<string, Set<() => void>>();
 
 const actionMappings: Partial<Record<TaskType, Partial<Record<string, string>>>> = {
   test: { webllm: 'test' },
@@ -77,6 +81,10 @@ function resolveTaskAction(taskType: TaskType, repoId: string): TaskAction {
   }
 
   return { repo, action };
+}
+
+export function validateTaskInput(input: AgentTaskInput): void {
+  resolveTaskAction(input.taskType, input.repo);
 }
 
 function getTask(taskId: string): AgentTask {
@@ -132,6 +140,7 @@ function storeRunResult(task: AgentTask, result: RunResult): void {
       : `Allowlisted action exited with code ${result.exitCode}.`
     : null;
   task.finishedAt = now();
+  notifyTaskSettled(task.id);
 }
 
 async function executeTask(taskId: string, action: TaskAction): Promise<void> {
@@ -148,6 +157,7 @@ async function executeTask(taskId: string, action: TaskAction): Promise<void> {
     task.status = 'failed';
     task.error = error instanceof Error ? error.message : String(error);
     task.finishedAt = now();
+    notifyTaskSettled(task.id);
   }
 }
 
@@ -180,6 +190,36 @@ export function getTaskStatus(taskId: string): AgentTaskStatus {
   return taskStatus(getTask(taskId));
 }
 
+function isTerminal(status: TaskStatus): boolean {
+  return status === 'completed' || status === 'failed' || status === 'cancelled';
+}
+
+function notifyTaskSettled(taskId: string): void {
+  const listeners = taskSettledListeners.get(taskId);
+  if (!listeners) return;
+  taskSettledListeners.delete(taskId);
+  for (const listener of listeners) listener();
+}
+
+export function watchTask(taskId: string, listener: () => void): () => void {
+  const task = getTask(taskId);
+  if (isTerminal(task.status)) {
+    listener();
+    return () => {};
+  }
+
+  const listeners = taskSettledListeners.get(taskId) ?? new Set<() => void>();
+  listeners.add(listener);
+  taskSettledListeners.set(taskId, listeners);
+
+  return () => {
+    const current = taskSettledListeners.get(taskId);
+    if (!current) return;
+    current.delete(listener);
+    if (current.size === 0) taskSettledListeners.delete(taskId);
+  };
+}
+
 export function getTaskResult(taskId: string): {
   id: string;
   status: TaskStatus;
@@ -210,6 +250,7 @@ export function cancelTask(taskId: string): {
     task.status = 'cancelled';
     task.error = 'Task cancelled before execution.';
     task.finishedAt = now();
+    notifyTaskSettled(task.id);
     return { cancelled: true, task: taskStatus(task) };
   }
 

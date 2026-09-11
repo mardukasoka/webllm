@@ -61,7 +61,34 @@ Allowlisted Task Runner
 Repo/Test/Audit capability
 ```
 
-There is no continuous scheduler, persistent background worker, remote AI provider, or public MCP transport in v0.1.
+There is no persistent background worker, remote AI provider, or public MCP transport in v0.1; recurring behavior is limited to the in-memory schedule timers described above.
+
+### Scheduler
+
+- `scheduler.create` — create an enabled recurring schedule for an existing bounded task mapping.
+- `scheduler.list` — list in-memory schedules.
+- `scheduler.get` — inspect one schedule.
+- `scheduler.enable` / `scheduler.disable` — control its timer.
+- `scheduler.run_now` — trigger one occurrence immediately through `agents.submit`.
+- `scheduler.remove` — remove a schedule and its timer.
+
+The scheduler is an in-memory timer manager. Intervals must be between 15 minutes and 10080 minutes (one week); schedules disappear when the MCP process restarts. Only enabled schedules are timed, overlapping runs are skipped, and a running task is never killed by the scheduler. The scheduler never bypasses `agents.submit`, never constructs commands, and never performs automatic repairs.
+
+```text
+Council
+   |
+Atlas MCP
+   |
+Scheduler
+   |
+agents.submit
+   |
+Allowlisted runner
+   |
+Tests / lint / audits
+```
+
+There are no Git writes, remote AI calls, swarm workers, autonomous code edits, or continuous high-frequency loops. Future worker/scheduler persistence can be added behind this same bounded task boundary.
 
 ## Initial registry
 
