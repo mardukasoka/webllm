@@ -130,7 +130,45 @@ describe("completed multi-metric integration", () => {
       experimentId: importedId,
       overallDisposition: "keep",
     });
-    expect(multiExperimentSnapshotLimits()).toMatchObject({ filesystemWrites: false, duplicatePolicy: "reject" });
+    expect(multiExperimentSnapshotLimits()).toMatchObject({ filesystemWrites: false, duplicatePolicy: "reject-preflight" });
+  });
+
+  it("preflights all snapshot ids before importing anything", () => {
+    const suffix = Date.now();
+    const existingId = `snapshot-existing-${suffix}`;
+    const newId = `snapshot-new-${suffix}`;
+    createMultiExperiment({
+      experimentId: existingId,
+      goal: "Existing",
+      hypothesis: "Already present",
+      sourceCommit: "existing",
+      metrics: [{ metric: "score", direction: "maximize", baseline: 0, minimumDelta: 0, required: true }],
+    });
+
+    expect(() => importMultiExperimentSnapshot({
+      version: 1,
+      experiments: [
+        {
+          experimentId: newId,
+          goal: "Would otherwise import",
+          hypothesis: "Must remain absent",
+          sourceCommit: "new",
+          metrics: [{ metric: "score", direction: "maximize", baseline: 0, minimumDelta: 0, required: true }],
+          parameters: {},
+          observations: [],
+        },
+        {
+          experimentId: existingId,
+          goal: "Duplicate",
+          hypothesis: "Must reject whole snapshot",
+          sourceCommit: "existing",
+          metrics: [{ metric: "score", direction: "maximize", baseline: 0, minimumDelta: 0, required: true }],
+          parameters: {},
+          observations: [],
+        },
+      ],
+    })).toThrow(/already exists/);
+    expect(() => getMultiExperiment(newId)).toThrow(/Unknown multi-metric experiment/);
   });
 
   it("advertises a read-only bounded repository orchestrator", () => {
