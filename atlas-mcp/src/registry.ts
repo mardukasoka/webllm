@@ -45,6 +45,12 @@ export const repos: RepoDefinition[] = [
         command: 'npm',
         args: ['run', 'lint'],
         timeoutMs: 120000
+      },
+      typecheck: {
+        description: 'Run the Atlas MCP TypeScript no-emit check from the WebLLM repository.',
+        command: 'npm',
+        args: ['--prefix', 'atlas-mcp', 'run', 'check'],
+        timeoutMs: 120000
       }
     }
   },
