@@ -12,6 +12,18 @@ import type {
 
 const experimentRecords: EvaluatedExperiment[] = [];
 
+type ExperimentEvidence = Readonly<{
+  kind: 'council-comparison';
+  reviewId: string;
+  evidenceDigest: string;
+  metric: string;
+  observed: number;
+  derivation: string;
+  participantCount: number;
+}>;
+
+const experimentEvidence = new Map<string, ExperimentEvidence>();
+
 export const experimentPlanInputSchema = z.object({
   experimentId: z.string().min(1).optional(),
   goal: z.string().min(1),
@@ -78,18 +90,35 @@ export function evaluateStoredExperiment(input: ExperimentEvaluateInput) {
   return evaluated;
 }
 
+export function attachExperimentEvidence(experimentId: string, evidence: ExperimentEvidence) {
+  if (!plans.has(experimentId)) {
+    throw new Error(`Unknown experiment id '${experimentId}'.`);
+  }
+  if (experimentEvidence.has(experimentId)) {
+    throw new Error(`Experiment '${experimentId}' already has attached comparison evidence.`);
+  }
+  experimentEvidence.set(experimentId, Object.freeze({ ...evidence }));
+  return experimentEvidence.get(experimentId)!;
+}
+
+function withEvidence<T extends object>(experimentId: string, value: T) {
+  const evidence = experimentEvidence.get(experimentId);
+  return evidence ? { ...value, evidence } : value;
+}
+
 export function getExperiment(experimentId: string) {
   const record = experimentRecords.find((entry) => entry.experimentId === experimentId);
-  if (record) return record;
+  if (record) return withEvidence(experimentId, record);
   const plan = plans.get(experimentId);
   if (!plan) throw new Error(`Unknown experiment id '${experimentId}'.`);
-  return { status: 'planned', ...plan, execution: 'external', writes: false };
+  return withEvidence(experimentId, { status: 'planned', ...plan, execution: 'external', writes: false });
 }
 
 export function listExperiments() {
   return [...plans.values()].map((plan) => {
     const record = experimentRecords.find((entry) => entry.experimentId === plan.experimentId);
-    return record || { status: 'planned', ...plan, execution: 'external', writes: false };
+    const value = record || { status: 'planned', ...plan, execution: 'external', writes: false };
+    return withEvidence(plan.experimentId, value);
   });
 }
 
@@ -101,6 +130,7 @@ export function experimentStatus() {
     writes: false,
     planned: plans.size,
     evaluated: experimentRecords.length,
+    comparisonEvidenceAttached: experimentEvidence.size,
     dispositions: ['keep', 'reject', 'inconclusive']
   };
 }
