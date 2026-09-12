@@ -45,9 +45,12 @@ import {
   prepareReview,
   recordProposal
 } from './council-review.js';
+import { experimentStatus } from './experiments.js';
+import { registerExperimentTools } from './experiment-tools.js';
 
 serveStdio(() => {
   const server = new McpServer({ name: 'atlas-mcp', version: '0.1.0' });
+  registerExperimentTools(server);
 
   server.registerTool(
     'repos.list',
@@ -594,6 +597,10 @@ serveStdio(() => {
             'council.prepare_review',
             'council.review_status',
             'council.record_proposal',
+            'experiments.create',
+            'experiments.evaluate',
+            'experiments.get',
+            'experiments.list',
             'scheduler.create',
             'scheduler.list',
             'scheduler.get',
@@ -628,7 +635,8 @@ serveStdio(() => {
             writes: false,
             maxProposalFiles: 4,
             maxProposalBytes: 40_000
-          }
+          },
+          experiments: experimentStatus()
         }, null, 2)
       }]
     })
