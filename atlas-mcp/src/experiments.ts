@@ -12,7 +12,7 @@ import type {
 
 const experimentRecords: EvaluatedExperiment[] = [];
 
-type ExperimentEvidence = Readonly<{
+type CouncilComparisonEvidence = Readonly<{
   kind: 'council-comparison';
   reviewId: string;
   evidenceDigest: string;
@@ -21,6 +21,21 @@ type ExperimentEvidence = Readonly<{
   derivation: string;
   participantCount: number;
 }>;
+
+type WolframVerificationEvidence = Readonly<{
+  kind: 'wolfram-verification';
+  mode: 'wolfram' | 'wolfram-alpha' | 'wolfram-language';
+  operation: 'equation' | 'numeric' | 'units' | 'constant' | 'statistics' | 'astronomy' | 'physics';
+  metric: string;
+  observed: number;
+  verified: boolean;
+  query: string;
+  computation: string;
+  result: string;
+  evidenceDigest: string;
+}>;
+
+type ExperimentEvidence = CouncilComparisonEvidence | WolframVerificationEvidence;
 
 const experimentEvidence = new Map<string, ExperimentEvidence>();
 
@@ -95,9 +110,9 @@ export function attachExperimentEvidence(experimentId: string, evidence: Experim
     throw new Error(`Unknown experiment id '${experimentId}'.`);
   }
   if (experimentEvidence.has(experimentId)) {
-    throw new Error(`Experiment '${experimentId}' already has attached comparison evidence.`);
+    throw new Error(`Experiment '${experimentId}' already has attached evidence.`);
   }
-  experimentEvidence.set(experimentId, Object.freeze({ ...evidence }));
+  experimentEvidence.set(experimentId, Object.freeze({ ...evidence }) as ExperimentEvidence);
   return experimentEvidence.get(experimentId)!;
 }
 
@@ -123,6 +138,14 @@ export function listExperiments() {
 }
 
 export function experimentStatus() {
+  const evidenceCounts = [...experimentEvidence.values()].reduce(
+    (counts, evidence) => ({
+      ...counts,
+      [evidence.kind]: (counts[evidence.kind] || 0) + 1
+    }),
+    {} as Record<ExperimentEvidence['kind'], number>
+  );
+
   return {
     supported: true,
     persistence: 'in-memory',
@@ -130,7 +153,8 @@ export function experimentStatus() {
     writes: false,
     planned: plans.size,
     evaluated: experimentRecords.length,
-    comparisonEvidenceAttached: experimentEvidence.size,
+    evidenceAttached: experimentEvidence.size,
+    evidenceCounts,
     dispositions: ['keep', 'reject', 'inconclusive']
   };
 }
