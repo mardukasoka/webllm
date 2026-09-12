@@ -49,6 +49,33 @@ describe("repository experiment metrics", () => {
     expect(result.observed).toBe(7);
   });
 
+  it("derives TypeScript error counts from bounded compiler output", () => {
+    const success = deriveRepositoryMetric({
+      metric: "typecheck_error_count",
+      taskType: "typecheck",
+      taskStatus: "completed",
+      exitCode: 0,
+      timedOut: false,
+      stdout: "",
+      stderr: "",
+    });
+    const failure = deriveRepositoryMetric({
+      metric: "typecheck_error_count",
+      taskType: "typecheck",
+      taskStatus: "failed",
+      exitCode: 2,
+      timedOut: false,
+      stdout: [
+        "src/a.ts(1,1): error TS2322: Type 'string' is not assignable to type 'number'.",
+        "src/b.ts(2,3): error TS7006: Parameter 'x' implicitly has an 'any' type.",
+      ].join("\n"),
+      stderr: "",
+    });
+
+    expect(success.observed).toBe(0);
+    expect(failure.observed).toBe(2);
+  });
+
   it("derives task success deterministically", () => {
     const success = deriveRepositoryMetric({
       metric: "task_success_score",
@@ -72,7 +99,7 @@ describe("repository experiment metrics", () => {
     expect(failure.observed).toBe(0);
   });
 
-  it("rejects mismatched task types and documents the typecheck limitation", () => {
+  it("rejects mismatched task types and advertises the full bounded metric set", () => {
     expect(() => deriveRepositoryMetric({
       metric: "test_pass_rate",
       taskType: "lint",
@@ -83,11 +110,27 @@ describe("repository experiment metrics", () => {
       stderr: "",
     })).toThrow(/requires a bounded test task/);
 
+    expect(() => deriveRepositoryMetric({
+      metric: "typecheck_error_count",
+      taskType: "lint",
+      taskStatus: "failed",
+      exitCode: 1,
+      timedOut: false,
+      stdout: "src/a.ts(1,1): error TS2322: bad",
+      stderr: "",
+    })).toThrow(/requires a bounded typecheck task/);
+
     expect(repositoryMetricLimits()).toMatchObject({
       source: "bounded-agent-task",
       execution: "existing-allowlisted-task-only",
       writes: false,
-      unsupportedUntilAllowlisted: ["typecheck_error_count"],
+      supportedMetrics: expect.arrayContaining([
+        "test_pass_rate",
+        "test_failure_count",
+        "lint_error_count",
+        "typecheck_error_count",
+        "task_success_score",
+      ]),
     });
   });
 });
