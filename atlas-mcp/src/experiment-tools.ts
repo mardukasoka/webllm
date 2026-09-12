@@ -12,6 +12,10 @@ import {
   getExperiment,
   listExperiments
 } from './experiments.js';
+import {
+  evaluateExperimentFromWolfram,
+  wolframExperimentInputSchema
+} from './wolfram-verification.js';
 
 function errorResult(error: unknown) {
   return {
@@ -25,7 +29,8 @@ function errorResult(error: unknown) {
 
 const experimentEvaluationInputSchema = z.union([
   experimentEvaluateInputSchema,
-  comparisonExperimentInputSchema
+  comparisonExperimentInputSchema,
+  wolframExperimentInputSchema
 ]);
 
 export function registerExperimentTools(server: McpServer) {
@@ -47,14 +52,16 @@ export function registerExperimentTools(server: McpServer) {
   server.registerTool(
     'experiments.evaluate',
     {
-      description: 'Evaluate one stored experiment from a direct external metric or a provenance-linked Council comparison metric; records keep, reject, or inconclusive without applying changes.',
+      description: 'Evaluate one stored experiment from a direct external metric, a provenance-linked Council comparison metric, or bounded Wolfram verification evidence; records keep, reject, or inconclusive without applying changes.',
       inputSchema: experimentEvaluationInputSchema
     },
     async (input) => {
       try {
-        const result = 'comparison' in input
-          ? evaluateExperimentFromComparison(input)
-          : evaluateStoredExperiment(input);
+        const result = 'wolfram' in input
+          ? evaluateExperimentFromWolfram(input)
+          : 'comparison' in input
+            ? evaluateExperimentFromComparison(input)
+            : evaluateStoredExperiment(input);
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
         return errorResult(error);
@@ -65,7 +72,7 @@ export function registerExperimentTools(server: McpServer) {
   server.registerTool(
     'experiments.get',
     {
-      description: 'Get one in-memory experiment plan or evaluated record by id, including bounded comparison evidence when attached.',
+      description: 'Get one in-memory experiment plan or evaluated record by id, including bounded provenance evidence when attached.',
       inputSchema: z.object({ experimentId: z.string().min(1) }).strict()
     },
     async ({ experimentId }) => {
