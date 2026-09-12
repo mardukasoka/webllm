@@ -96,7 +96,7 @@ describe("multi-metric experiments", () => {
       evidence: { kind: "wolfram-verification", evidenceDigest: "digest-wolfram" },
     });
     expect(result.overallDisposition).toBe("keep");
-    expect(result.observations.find((item) => item.metric === "wolfram_verification_score").disposition).toBe("keep");
+    expect(result.observations.find((item) => item.metric === "wolfram_verification_score").disposition).toBe("inconclusive");
   });
 
   it("rejects duplicate metric definitions and repeated observations", () => {
@@ -132,6 +132,6 @@ describe("multi-metric experiments", () => {
       writes: false,
       maxMetricsPerExperiment: 12,
     });
-    expect(getMultiExperiment(`multi-${Date.now()}-missing`)).toBeDefined;
+    expect(() => getMultiExperiment(`multi-${Date.now()}-missing`)).toThrow(/Unknown multi-metric experiment/);
   });
 });
