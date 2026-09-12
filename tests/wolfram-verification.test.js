@@ -27,7 +27,7 @@ describe("Wolfram experiment verification", () => {
         operation: "physics",
         query: "Verify E = m c^2 for m = 1 kg",
         computation: "Quantity[1, \"Kilograms\"] Quantity[1, \"SpeedOfLight\"]^2",
-        result: "8.9875517873681764*^16 joules",
+        result: "89875517873681764 joules",
         verified: true,
       },
     });
@@ -49,7 +49,7 @@ describe("Wolfram experiment verification", () => {
     createExperiment({
       experimentId: id,
       goal: "Check an equation claim",
-      hypothesis: "The proposed identity is correct",
+      hypothesis: "The proposed identity holds without restrictions",
       metric: "wolfram_verification_score",
       direction: "maximize",
       baseline: 1,
@@ -61,11 +61,11 @@ describe("Wolfram experiment verification", () => {
       experimentId: id,
       metric: "wolfram_verification_score",
       wolfram: {
-        mode: "wolfram",
+        mode: "wolfram-language",
         operation: "equation",
-        query: "Is (a+b)^2 = a^2+b^2?",
+        query: "Does (a+b)^2 = a^2+b^2 hold identically?",
         computation: "FullSimplify[(a+b)^2 == a^2+b^2]",
-        result: "False",
+        result: "a*b == 0",
         verified: false,
       },
     });
