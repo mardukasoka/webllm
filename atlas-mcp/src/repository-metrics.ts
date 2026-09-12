@@ -10,6 +10,8 @@ const METRICS = [
   'task_success_score'
 ] as const;
 
+export type RepositoryMetric = typeof METRICS[number];
+
 export const repositoryMetricInputSchema = z.object({
   experimentId: z.string().min(1),
   metric: z.enum(METRICS),
@@ -65,6 +67,36 @@ function parseEslintErrors(output: string, exitCode: number | null): ParsedMetri
   throw new Error('Could not derive ESLint error count from failed bounded task output.');
 }
 
+export function deriveRepositoryMetric(input: {
+  metric: RepositoryMetric;
+  taskType: 'test' | 'lint' | 'typecheck' | 'debug' | 'audit';
+  taskStatus: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  exitCode: number | null;
+  timedOut: boolean;
+  stdout: string;
+  stderr: string;
+}): ParsedMetric {
+  const output = `${input.stdout}\n${input.stderr}`;
+
+  if (input.metric === 'task_success_score') {
+    const success = input.taskStatus === 'completed' && input.exitCode === 0 && !input.timedOut;
+    return {
+      observed: success ? 1 : 0,
+      derivation: `Derived from task status '${input.taskStatus}', exitCode ${input.exitCode}, timedOut ${input.timedOut}.`
+    };
+  }
+  if (input.metric === 'test_pass_rate') {
+    if (input.taskType !== 'test') throw new Error('test_pass_rate requires a bounded test task.');
+    return parseVitest(output);
+  }
+  if (input.metric === 'test_failure_count') {
+    if (input.taskType !== 'test') throw new Error('test_failure_count requires a bounded test task.');
+    return parseVitestFailures(output);
+  }
+  if (input.taskType !== 'lint') throw new Error('lint_error_count requires a bounded lint task.');
+  return parseEslintErrors(output, input.exitCode);
+}
+
 function digestEvidence(value: object) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
@@ -80,25 +112,15 @@ export function evaluateExperimentFromRepositoryTask(input: RepositoryMetricInpu
   const result = task.result;
   if (!result) throw new Error(`Task '${task.id}' has no bounded result.`);
 
-  const output = `${result.stdout}\n${result.stderr}`;
-  let parsed: ParsedMetric;
-
-  if (input.metric === 'task_success_score') {
-    const success = task.status === 'completed' && result.exitCode === 0 && !result.timedOut;
-    parsed = {
-      observed: success ? 1 : 0,
-      derivation: `Derived from task status '${task.status}', exitCode ${result.exitCode}, timedOut ${result.timedOut}.`
-    };
-  } else if (input.metric === 'test_pass_rate') {
-    if (status.taskType !== 'test') throw new Error('test_pass_rate requires a bounded test task.');
-    parsed = parseVitest(output);
-  } else if (input.metric === 'test_failure_count') {
-    if (status.taskType !== 'test') throw new Error('test_failure_count requires a bounded test task.');
-    parsed = parseVitestFailures(output);
-  } else {
-    if (status.taskType !== 'lint') throw new Error('lint_error_count requires a bounded lint task.');
-    parsed = parseEslintErrors(output, result.exitCode);
-  }
+  const parsed = deriveRepositoryMetric({
+    metric: input.metric,
+    taskType: status.taskType,
+    taskStatus: task.status,
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+    stdout: result.stdout,
+    stderr: result.stderr
+  });
 
   const evidenceBase = {
     kind: 'repository-metric' as const,
