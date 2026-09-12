@@ -25,6 +25,27 @@ import {
   observeMultiExperimentFromRepositoryTask
 } from './multi-repository-metrics.js';
 import {
+  multiWolframInputSchema,
+  observeMultiExperimentFromWolfram
+} from './multi-wolfram-verification.js';
+import {
+  multiComparisonInputSchema,
+  observeMultiExperimentFromComparison
+} from './multi-comparison-experiment.js';
+import {
+  orchestrateExperimentInputSchema,
+  orchestrateMultiExperiment
+} from './experiment-orchestrator.js';
+import {
+  compareMultiExperimentCandidates,
+  multiCandidateComparisonInputSchema
+} from './multi-candidate-comparison.js';
+import {
+  exportMultiExperimentSnapshot,
+  importMultiExperimentSnapshot,
+  multiExperimentSnapshotSchema
+} from './multi-experiment-snapshot.js';
+import {
   evaluateExperimentFromRepositoryTask,
   repositoryMetricInputSchema
 } from './repository-metrics.js';
@@ -153,6 +174,92 @@ export function registerExperimentTools(server: McpServer) {
     async (input) => {
       try {
         return { content: [{ type: 'text', text: JSON.stringify(observeMultiExperimentFromRepositoryTask(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_observe_wolfram',
+    {
+      description: 'Attach one declared multi-metric observation derived from bounded external Wolfram verification evidence.',
+      inputSchema: multiWolframInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(observeMultiExperimentFromWolfram(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_observe_comparison',
+    {
+      description: 'Attach one explicit caller-derived metric from a bounded non-voting Council comparison to a multi-metric experiment.',
+      inputSchema: multiComparisonInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(observeMultiExperimentFromComparison(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_run_repository_checks',
+    {
+      description: 'Run existing allowlisted WebLLM test, lint, and typecheck tasks and populate declared deterministic multi-metric observations; performs no repository writes.',
+      inputSchema: orchestrateExperimentInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(await orchestrateMultiExperiment(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_compare_candidates',
+    {
+      description: 'Compare two to six multi-metric candidate experiments with identical metric definitions without ranking, selecting, or averaging them.',
+      inputSchema: multiCandidateComparisonInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(compareMultiExperimentCandidates(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_export_snapshot',
+    {
+      description: 'Export portable versioned JSON state for host-managed persistence of multi-metric experiments; Atlas MCP performs no filesystem writes.',
+      inputSchema: z.object({}).strict()
+    },
+    async () => ({
+      content: [{ type: 'text', text: JSON.stringify(exportMultiExperimentSnapshot(), null, 2) }]
+    })
+  );
+
+  server.registerTool(
+    'experiments.multi_import_snapshot',
+    {
+      description: 'Import a validated versioned multi-metric experiment snapshot into empty ids; duplicates are rejected.',
+      inputSchema: multiExperimentSnapshotSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(importMultiExperimentSnapshot(input), null, 2) }] };
       } catch (error) {
         return errorResult(error);
       }
