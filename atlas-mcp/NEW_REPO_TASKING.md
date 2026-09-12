@@ -13,60 +13,69 @@ This task set extracts useful patterns from the forked `awesome-autoresearch`, `
 
 ## Increment A — Experiment layer
 
-Status: foundation added.
+Status: bounded store implemented; central MCP registration pending.
 
 Source patterns:
 - `research-loop`: deterministic runner, isolated worktrees, authoritative metric evaluation, append-only experiment ledger.
 - `recursive-improve`: execution traces, failure analysis, keep-or-revert evaluation.
 - `goal-md` / `autoresearch-anything`: explicit measurable fitness function before optimization.
 
-Implemented primitive:
+Implemented:
 - `lib/experiment-ledger.js`
+- `atlas-mcp/src/experiments.ts`
 - `tests/experiment-ledger.test.js`
+- `tests/atlas-experiments.test.js`
 
 Current scope:
 - plan validation
 - maximize/minimize metrics
 - minimum improvement threshold
 - `keep`, `reject`, `inconclusive`
-- immutable append helper with duplicate-id rejection
+- in-memory plan/evaluation registry
+- immutable append semantics and duplicate-id rejection
+- external execution only; zero repository writes
 
-Not yet implemented:
+Next:
+1. Register `experiments.create`, `experiments.evaluate`, `experiments.list`, and `experiments.get` in the central MCP server.
+2. Link experiment execution only to existing allowlisted `agents.submit` tasks.
+3. Extend records with task id and evidence digest after that linkage is verified.
+4. Add isolated worktrees only after the evaluation path is verified.
+
+Not authorized:
 - persistent storage
 - automatic experiment execution
 - Git worktrees
 - model training
 - automatic keep/revert writes
 
-Next:
-1. Add MCP `experiments.create`, `experiments.evaluate`, `experiments.list/get` around an in-memory registry.
-2. Link experiment execution only to existing allowlisted `agents.submit` tasks.
-3. Record source commit, task id, metric definition, before/after values, evidence digest, and disposition.
-4. Add isolated worktrees only after the evaluation path is verified.
-
 ## Increment B — Remote provider federation
 
-Status: foundation added.
+Status: collection and Council proposal-envelope bridge implemented; live provider registry pending.
 
 Source pattern:
 - `G0DM0D3`: OpenAI-compatible model discovery and provider aggregation across OpenRouter, Venice, and local OpenAI-compatible servers.
 
-Implemented primitive:
+Implemented:
 - `lib/provider-federation.js`
+- `lib/council-federation-review.js`
 - `tests/provider-federation.test.js`
+- `tests/council-federation-review.test.js`
 
 Current scope:
 - OpenAI-compatible `/v1/models` discovery
 - bounded parallel collection from 1–8 explicit model ids
 - per-model success/failure retained
-- no fallback
-- no ranking, scoring, winner, synthesis, or voting
 - G0DM0D3 mode explicitly disables `godmode`, `autotune`, `parseltongue`, STM transforms, and dataset contribution
+- successful candidate text must pass the existing strict Council proposal parser
+- proposal envelopes preserve review id, evidence digest, provider model, and runtime provenance
+- at least two valid proposals are required before entering the existing non-voting comparator
+- provider failures and invalid proposal outputs remain visible
+- comparison emits no winner, ranking, vote, selected proposal, or merged patch
 
 Next:
 1. Add a Council-facing provider registry that stores endpoint/model metadata separately from credentials.
-2. Feed successful candidate envelopes into `council-review-comparison.js`.
-3. Preserve provider/model provenance and evidence digest for every candidate.
+2. Register a bounded federation entry point only after credential handling is verified.
+3. Require authoritative `council.record_proposal` validation before any proposal becomes eligible for downstream training data.
 4. Add Venice/OpenRouter catalog adapters only when credential handling is verified.
 5. Keep local LFM as a first-class peer, not a fallback hidden behind remote routing.
 
@@ -109,9 +118,9 @@ Provider terms and model/output licenses must be checked before any proprietary-
 After syncing `atlas-mcp-v0.1`:
 
 ```bash
-npm test -- tests/experiment-ledger.test.js tests/provider-federation.test.js
+npm test -- tests/experiment-ledger.test.js tests/atlas-experiments.test.js tests/provider-federation.test.js tests/council-federation-review.test.js tests/council-review-comparison.test.js
 npm run lint
 cd atlas-mcp && npm run check
 ```
 
-The two new primitives are intentionally not wired to live credentials, MCP execution, training, or repository mutation yet.
+These increments still do not persist credentials, call live providers automatically, train models, apply proposals, or mutate repositories.
