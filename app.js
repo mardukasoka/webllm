@@ -115,6 +115,9 @@ import {
 import {
   generateCouncilParticipant,
 } from "./lib/council-provider.js";
+import {
+  runLocalLfmCouncilReview,
+} from "./lib/council-review-browser.js";
 
 "use strict";
 
@@ -347,6 +350,26 @@ function createLocalCouncilParticipant() {
     },
   };
 }
+
+async function runLoadedLocalCouncilReview({
+  reviewPacket,
+  evidenceDigest,
+  recordProposal,
+} = {}) {
+  return runLocalLfmCouncilReview({
+    reviewPacket,
+    evidenceDigest,
+    participant: createLocalCouncilParticipant(),
+    recordProposal,
+    log(report) {
+      console.info("Local Council review", report);
+    },
+  });
+}
+
+globalThis.webllmCouncilReview = Object.freeze({
+  run: runLoadedLocalCouncilReview,
+});
 
 async function loadRoundtableRemoteModel() {
   const adapter =
