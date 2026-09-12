@@ -13,6 +13,14 @@ import {
   listExperiments
 } from './experiments.js';
 import {
+  createMultiExperiment,
+  getMultiExperiment,
+  listMultiExperiments,
+  multiExperimentCreateInputSchema,
+  multiExperimentObserveInputSchema,
+  observeMultiExperiment
+} from './multi-experiments.js';
+import {
   evaluateExperimentFromRepositoryTask,
   repositoryMetricInputSchema
 } from './repository-metrics.js';
@@ -99,6 +107,62 @@ export function registerExperimentTools(server: McpServer) {
     },
     async () => ({
       content: [{ type: 'text', text: JSON.stringify(listExperiments(), null, 2) }]
+    })
+  );
+
+  server.registerTool(
+    'experiments.multi_create',
+    {
+      description: 'Create a bounded in-memory multi-metric experiment with explicit per-metric baselines, directions, thresholds, and required flags.',
+      inputSchema: multiExperimentCreateInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(createMultiExperiment(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_observe',
+    {
+      description: 'Attach one bounded metric observation and evidence reference to a multi-metric experiment; no metric may be observed twice.',
+      inputSchema: multiExperimentObserveInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(observeMultiExperiment(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_get',
+    {
+      description: 'Get one multi-metric experiment with per-metric observations and rule-based overall disposition.',
+      inputSchema: z.object({ experimentId: z.string().min(1) }).strict()
+    },
+    async ({ experimentId }) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(getMultiExperiment(experimentId), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_list',
+    {
+      description: 'List bounded in-memory multi-metric experiments.',
+      inputSchema: z.object({}).strict()
+    },
+    async () => ({
+      content: [{ type: 'text', text: JSON.stringify(listMultiExperiments(), null, 2) }]
     })
   );
 }
