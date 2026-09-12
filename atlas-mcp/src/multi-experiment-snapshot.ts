@@ -62,18 +62,52 @@ export function exportMultiExperimentSnapshot() {
   };
 }
 
+function assertExperimentAbsent(experimentId: string) {
+  try {
+    getMultiExperiment(experimentId);
+    throw new Error(`Multi-metric experiment '${experimentId}' already exists.`);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Unknown multi-metric experiment')) return;
+    throw error;
+  }
+}
+
+function preflightSnapshot(snapshot: Snapshot) {
+  const ids = snapshot.experiments.map((item) => item.experimentId);
+  if (new Set(ids).size !== ids.length) {
+    throw new Error('Snapshot experiment ids must be unique.');
+  }
+
+  for (const item of snapshot.experiments) {
+    assertExperimentAbsent(item.experimentId);
+
+    const metricNames = item.metrics.map((metric) => metric.metric);
+    if (new Set(metricNames).size !== metricNames.length) {
+      throw new Error(`Snapshot experiment '${item.experimentId}' contains duplicate metric definitions.`);
+    }
+
+    const observationNames = item.observations.map((observation) => observation.metric);
+    if (new Set(observationNames).size !== observationNames.length) {
+      throw new Error(`Snapshot experiment '${item.experimentId}' contains duplicate observations.`);
+    }
+
+    const declared = new Set(metricNames);
+    for (const observation of item.observations) {
+      if (!declared.has(observation.metric)) {
+        throw new Error(
+          `Snapshot observation metric '${observation.metric}' is not declared by experiment '${item.experimentId}'.`
+        );
+      }
+    }
+  }
+}
+
 export function importMultiExperimentSnapshot(input: Snapshot) {
   const snapshot = multiExperimentSnapshotSchema.parse(input);
+  preflightSnapshot(snapshot);
   const imported: string[] = [];
 
   for (const item of snapshot.experiments) {
-    try {
-      getMultiExperiment(item.experimentId);
-      throw new Error(`Multi-metric experiment '${item.experimentId}' already exists.`);
-    } catch (error) {
-      if (error instanceof Error && !error.message.startsWith('Unknown multi-metric experiment')) throw error;
-    }
-
     createMultiExperiment({
       experimentId: item.experimentId,
       goal: item.goal,
@@ -108,6 +142,6 @@ export function multiExperimentSnapshotLimits() {
     maxExperiments: 200,
     storage: 'host-managed-json-snapshot',
     filesystemWrites: false,
-    duplicatePolicy: 'reject'
+    duplicatePolicy: 'reject-preflight'
   };
 }
