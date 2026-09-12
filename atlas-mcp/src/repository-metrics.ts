@@ -7,6 +7,7 @@ const METRICS = [
   'test_pass_rate',
   'test_failure_count',
   'lint_error_count',
+  'typecheck_error_count',
   'task_success_score'
 ] as const;
 
@@ -67,6 +68,22 @@ function parseEslintErrors(output: string, exitCode: number | null): ParsedMetri
   throw new Error('Could not derive ESLint error count from failed bounded task output.');
 }
 
+function parseTypeScriptErrors(output: string, exitCode: number | null): ParsedMetric {
+  if (exitCode === 0) {
+    return { observed: 0, derivation: 'TypeScript no-emit check exited successfully.' };
+  }
+
+  const matches = output.match(/error TS\d+:/g) || [];
+  if (matches.length > 0) {
+    return {
+      observed: matches.length,
+      derivation: `Parsed TypeScript compiler output: ${matches.length} error${matches.length === 1 ? '' : 's'}.`
+    };
+  }
+
+  throw new Error('Could not derive TypeScript error count from failed bounded task output.');
+}
+
 export function deriveRepositoryMetric(input: {
   metric: RepositoryMetric;
   taskType: 'test' | 'lint' | 'typecheck' | 'debug' | 'audit';
@@ -93,8 +110,12 @@ export function deriveRepositoryMetric(input: {
     if (input.taskType !== 'test') throw new Error('test_failure_count requires a bounded test task.');
     return parseVitestFailures(output);
   }
-  if (input.taskType !== 'lint') throw new Error('lint_error_count requires a bounded lint task.');
-  return parseEslintErrors(output, input.exitCode);
+  if (input.metric === 'lint_error_count') {
+    if (input.taskType !== 'lint') throw new Error('lint_error_count requires a bounded lint task.');
+    return parseEslintErrors(output, input.exitCode);
+  }
+  if (input.taskType !== 'typecheck') throw new Error('typecheck_error_count requires a bounded typecheck task.');
+  return parseTypeScriptErrors(output, input.exitCode);
 }
 
 function digestEvidence(value: object) {
@@ -154,7 +175,6 @@ export function repositoryMetricLimits() {
     supportedMetrics: [...METRICS],
     source: 'bounded-agent-task',
     execution: 'existing-allowlisted-task-only',
-    writes: false,
-    unsupportedUntilAllowlisted: ['typecheck_error_count']
+    writes: false
   };
 }
