@@ -1,6 +1,10 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod/v4';
 import {
+  comparisonExperimentInputSchema,
+  evaluateExperimentFromComparison
+} from './comparison-experiment.js';
+import {
   createExperiment,
   evaluateStoredExperiment,
   experimentEvaluateInputSchema,
@@ -18,6 +22,11 @@ function errorResult(error: unknown) {
     }]
   };
 }
+
+const experimentEvaluationInputSchema = z.union([
+  experimentEvaluateInputSchema,
+  comparisonExperimentInputSchema
+]);
 
 export function registerExperimentTools(server: McpServer) {
   server.registerTool(
@@ -38,12 +47,15 @@ export function registerExperimentTools(server: McpServer) {
   server.registerTool(
     'experiments.evaluate',
     {
-      description: 'Evaluate one stored experiment from an externally observed metric and record keep, reject, or inconclusive.',
-      inputSchema: experimentEvaluateInputSchema
+      description: 'Evaluate one stored experiment from a direct external metric or a provenance-linked Council comparison metric; records keep, reject, or inconclusive without applying changes.',
+      inputSchema: experimentEvaluationInputSchema
     },
     async (input) => {
       try {
-        return { content: [{ type: 'text', text: JSON.stringify(evaluateStoredExperiment(input), null, 2) }] };
+        const result = 'comparison' in input
+          ? evaluateExperimentFromComparison(input)
+          : evaluateStoredExperiment(input);
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       } catch (error) {
         return errorResult(error);
       }
@@ -53,7 +65,7 @@ export function registerExperimentTools(server: McpServer) {
   server.registerTool(
     'experiments.get',
     {
-      description: 'Get one in-memory experiment plan or evaluated record by id.',
+      description: 'Get one in-memory experiment plan or evaluated record by id, including bounded comparison evidence when attached.',
       inputSchema: z.object({ experimentId: z.string().min(1) }).strict()
     },
     async ({ experimentId }) => {
