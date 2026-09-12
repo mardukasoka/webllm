@@ -21,6 +21,10 @@ import {
   observeMultiExperiment
 } from './multi-experiments.js';
 import {
+  multiRepositoryMetricInputSchema,
+  observeMultiExperimentFromRepositoryTask
+} from './multi-repository-metrics.js';
+import {
   evaluateExperimentFromRepositoryTask,
   repositoryMetricInputSchema
 } from './repository-metrics.js';
@@ -134,6 +138,21 @@ export function registerExperimentTools(server: McpServer) {
     async (input) => {
       try {
         return { content: [{ type: 'text', text: JSON.stringify(observeMultiExperiment(input), null, 2) }] };
+      } catch (error) {
+        return errorResult(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'experiments.multi_observe_repository',
+    {
+      description: 'Derive one declared multi-metric observation from an existing settled allowlisted repository task and attach bounded provenance; does not launch or modify tasks.',
+      inputSchema: multiRepositoryMetricInputSchema
+    },
+    async (input) => {
+      try {
+        return { content: [{ type: 'text', text: JSON.stringify(observeMultiExperimentFromRepositoryTask(input), null, 2) }] };
       } catch (error) {
         return errorResult(error);
       }
