@@ -41,7 +41,7 @@ type RepositoryMetricEvidence = Readonly<{
   taskType: 'test' | 'lint' | 'typecheck' | 'debug' | 'audit';
   repo: string;
   action: string;
-  metric: 'test_pass_rate' | 'test_failure_count' | 'lint_error_count' | 'task_success_score';
+  metric: 'test_pass_rate' | 'test_failure_count' | 'lint_error_count' | 'typecheck_error_count' | 'task_success_score';
   observed: number;
   derivation: string;
   exitCode: number | null;
