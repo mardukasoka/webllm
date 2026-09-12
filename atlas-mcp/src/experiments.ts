@@ -35,7 +35,21 @@ type WolframVerificationEvidence = Readonly<{
   evidenceDigest: string;
 }>;
 
-type ExperimentEvidence = CouncilComparisonEvidence | WolframVerificationEvidence;
+type RepositoryMetricEvidence = Readonly<{
+  kind: 'repository-metric';
+  taskId: string;
+  taskType: 'test' | 'lint' | 'typecheck' | 'debug' | 'audit';
+  repo: string;
+  action: string;
+  metric: 'test_pass_rate' | 'test_failure_count' | 'lint_error_count' | 'task_success_score';
+  observed: number;
+  derivation: string;
+  exitCode: number | null;
+  timedOut: boolean;
+  evidenceDigest: string;
+}>;
+
+type ExperimentEvidence = CouncilComparisonEvidence | WolframVerificationEvidence | RepositoryMetricEvidence;
 
 const experimentEvidence = new Map<string, ExperimentEvidence>();
 
