@@ -64,6 +64,7 @@ const taskSettledListeners = new Map<string, Set<() => void>>();
 const actionMappings: Partial<Record<TaskType, Partial<Record<string, string>>>> = {
   test: { webllm: 'test' },
   lint: { webllm: 'lint' },
+  typecheck: { webllm: 'typecheck' },
   audit: { 'chess-atlas': 'catalog' }
 };
 
